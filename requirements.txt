@@ -12,4 +12,4 @@ dataverse-api
 python-dotenv
 azure.search.documents
 azure.core
-azure.cognitiveservices
+azure.cognitiveservices.speech
