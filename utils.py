@@ -9,8 +9,8 @@ def recognize_speech_from_mic():
     # Load environment variables
     load_dotenv()
 
-    SPEECH_KEY = os.getenv("SPEECH_KEY")
-    SPEECH_REGION = os.getenv("SPEECH_REGION")
+    SPEECH_KEY = 'EXsLZoIDExLz7kklm0qfo9cyCVrLfTgk4NZoVOVU2ySpUQZXDIjMJQQJ99BGACYeBjFXJ3w3AAAYACOGYGiP'
+    SPEECH_REGION = 'eastus'
 
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config)
@@ -25,10 +25,10 @@ def ask_openai(prompt):
     # Load environment variables
     load_dotenv()
 
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_DEPLOYMENT_NAME = os.getenv("OPENAI_DEPLOYMENT_NAME")
-    OPENAI_API_URL = os.getenv("OPENAI_API_URL")
-    OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
+    OPENAI_API_KEY = '1kjOqx7DUuB3TdDBcN1jlHL4PDARSXQHnuVmW0JefylAChtNiuBAJQQJ99BGACYeBjFXJ3w3AAAAACOGu2hd'
+    OPENAI_DEPLOYMENT_NAME = 'gpt-4o-mini'
+    OPENAI_API_URL = 'https://aiftestroman1.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview'
+    OPENAI_API_VERSION = '2025-01-01-preview'
 
     # Azure OpenAI client
     client = AzureOpenAI(
@@ -69,8 +69,8 @@ def synthesize_speech(text):
     # Load environment variables
     load_dotenv()
 
-    SPEECH_KEY = os.getenv("SPEECH_KEY")
-    SPEECH_REGION = os.getenv("SPEECH_REGION")
+    SPEECH_KEY = 'EXsLZoIDExLz7kklm0qfo9cyCVrLfTgk4NZoVOVU2ySpUQZXDIjMJQQJ99BGACYeBjFXJ3w3AAAYACOGYGiP'
+    SPEECH_REGION = 'eastus'
 
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
