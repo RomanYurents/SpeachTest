@@ -1,36 +1,26 @@
-# utils.py
-
-import azure.cognitiveservices.speech as speechsdk
-from openai import AzureOpenAI
 import os
+from openai import AzureOpenAI
+import azure.cognitiveservices.speech as speechsdk
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
+# Load environment variables (optional)
 from dotenv import load_dotenv
+load_dotenv()
 
-def recognize_speech_from_mic():
-    # Load environment variables
-    load_dotenv()
+# Azure Keys
+SPEECH_KEY = os.getenv("SPEECH_KEY")
+SPEECH_REGION = os.getenv("SPEECH_REGION")
 
-    SPEECH_KEY = 'EXsLZoIDExLz7kklm0qfo9cyCVrLfTgk4NZoVOVU2ySpUQZXDIjMJQQJ99BGACYeBjFXJ3w3AAAYACOGYGiP'
-    SPEECH_REGION = 'eastus'
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_DEPLOYMENT_NAME = os.getenv("OPENAI_DEPLOYMENT_NAME")
+OPENAI_API_URL = os.getenv("OPENAI_API_URL")
+OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
 
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
-    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config)
-    print("Listening...")
+AZURE_BLOB_CONNECTION = os.getenv("AZURE_BLOB_CONNECTION")
+AZURE_BLOB_CONTAINER = os.getenv("AZURE_BLOB_CONTAINER")
 
-    result = recognizer.recognize_once()
-    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-        return result.text
-    return "Speech not recognized."
 
-def ask_openai(prompt):
-    # Load environment variables
-    load_dotenv()
-
-    OPENAI_API_KEY = '1kjOqx7DUuB3TdDBcN1jlHL4PDARSXQHnuVmW0JefylAChtNiuBAJQQJ99BGACYeBjFXJ3w3AAAAACOGu2hd'
-    OPENAI_DEPLOYMENT_NAME = 'gpt-4o-mini'
-    OPENAI_API_URL = 'https://aiftestroman1.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview'
-    OPENAI_API_VERSION = '2025-01-01-preview'
-
-    # Azure OpenAI client
+def ask_openai(prompt: str) -> str:
     client = AzureOpenAI(
         api_version=OPENAI_API_VERSION,
         azure_endpoint=OPENAI_API_URL,
@@ -38,22 +28,21 @@ def ask_openai(prompt):
     )
 
     messages = [
-            {"role": "system", "content": "You are a restaurant assistant. Now the restaurant menu includes 2 dishes: 'Carbonara' price '$4.5' and Risotto price '$4'"},
-            {"role": "user", "content": prompt}
-        ]
+        {
+            "role": "system",
+            "content": "You are a restaurant assistant. The menu includes 'Carbonara' ($4.5) and 'Risotto' ($4). Answer questions clearly."
+        },
+        {"role": "user", "content": prompt}
+    ]
 
     response_chunks = []
-    # Generate the completion
     completion = client.chat.completions.create(
         model=OPENAI_DEPLOYMENT_NAME,
         messages=messages,
-        max_tokens=16000,
+        max_tokens=1000,
         temperature=0.5,
         top_p=0.95,
-        frequency_penalty=0, # punishment for repetition
-        presence_penalty=0, # punishment for theme
-        stop=None,
-        stream=True # False - if we won't use chat
+        stream=True
     )
 
     for update in completion:
@@ -61,19 +50,23 @@ def ask_openai(prompt):
             chunk = update.choices[0].delta.content or ""
             response_chunks.append(chunk)
 
-    response_str = "".join(response_chunks)
+    return "".join(response_chunks)
 
-    return response_str
 
-def synthesize_speech(text):
-    # Load environment variables
-    load_dotenv()
-
-    SPEECH_KEY = 'EXsLZoIDExLz7kklm0qfo9cyCVrLfTgk4NZoVOVU2ySpUQZXDIjMJQQJ99BGACYeBjFXJ3w3AAAYACOGYGiP'
-    SPEECH_REGION = 'eastus'
-
+def synthesize_speech_from_text_to_file(text: str, filename: str):
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
-    audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
+    audio_config = speechsdk.audio.AudioOutputConfig(filename=filename)
 
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
     synthesizer.speak_text_async(text).get()
+
+
+def upload_to_blob(file_path: str) -> str:
+    blob_service_client = BlobServiceClient.from_connection_string(AZURE_BLOB_CONNECTION)
+    blob_client = blob_service_client.get_blob_client(container=AZURE_BLOB_CONTAINER, blob="response.mp3")
+
+    with open(file_path, "rb") as data:
+        blob_client.upload_blob(data, overwrite=True, content_settings=ContentSettings(content_type='audio/mpeg'))
+
+    blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_BLOB_CONTAINER}/response.mp3"
+    return blob_url
