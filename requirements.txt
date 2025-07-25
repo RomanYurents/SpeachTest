@@ -2,6 +2,7 @@
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues
 
+azure.identity
 streamlit
 azure-functions
 openai
@@ -18,5 +19,7 @@ twilio
 azure-storage-blob
 pydub
 ffmpeg
+azure-communication-callautomation
+azure.identity
 
 
