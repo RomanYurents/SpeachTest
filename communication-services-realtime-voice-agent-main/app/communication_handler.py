@@ -38,6 +38,18 @@ FAREWELL_PHRASES = [
     "that's all",
     "see you",
     "talk to you later",
+    "tack, det var allt",
+    "tack, hej då",
+    "tack",
+    "tack, adjö",
+    "tack, hej då",
+    "hej då",
+    "adjö",
+    "hej då",
+    "det var allt",
+    "vi ses",
+    "vi hörs senare",
+    "vi pratar senare"
 ]
 
 class CommunicationHandler:
