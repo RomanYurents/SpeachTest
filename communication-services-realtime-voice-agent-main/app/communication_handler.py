@@ -41,7 +41,7 @@ FAREWELL_PHRASES = [
 ]
 
 class CommunicationHandler:
-    voice_name = "alloy"
+    voice_name = "shimmer"
     system_prompt = (
         "You are an AI assistant. Answer user questions clearly and helpfully. Keep responses concise."
     )
@@ -127,6 +127,20 @@ class CommunicationHandler:
 
                     case "response.done":
                         print(f"Response Done: {message.response.id}")
+                         # If we've marked the call for end, now send ResponseCreateMessage and hang up
+                        if self.call_ended:
+                            await asyncio.sleep(1)  # Give it a moment to flush the audio
+                            await self.rt_client.send(ResponseCreateMessage())
+
+                            # Give the user some time to hear it
+                            await asyncio.sleep(6)
+
+                            try:
+                                call_connection = self.acs_client.get_call_connection(self.call_connection_id)
+                                await call_connection.hang_up(is_for_everyone=True)
+                                logger.info(f"Call {self.call_connection_id} ended.")
+                            except Exception as e:
+                                logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
 
                     case "error":
                         print(f"Error: {message.error}")
@@ -161,22 +175,11 @@ class CommunicationHandler:
         if self.call_ended:
             return
         self.call_ended = True
-        # Send final message
+
+        # Send final goodbye message
         content_part = InputTextContentPart(text=message)
         final_message = ItemCreateMessage(
             item=UserMessageItem(content=[content_part]),
             call_id=self.conversation_call_id
         )
         await self.rt_client.send(message=final_message)
-        await self.rt_client.send(ResponseCreateMessage())
-
-        # Wait briefly for the user to hear the message
-        await asyncio.sleep(2)
-
-        # Hang up call
-        try:
-            call_connection = self.acs_client.get_call_connection(self.call_connection_id)
-            await call_connection.hang_up(is_for_everyone=True)
-            logger.info(f"Call {self.call_connection_id} ended.")
-        except Exception as e:
-            logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
