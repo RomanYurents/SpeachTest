@@ -55,7 +55,7 @@ FAREWELL_PHRASES = [
 class CommunicationHandler:
     voice_name = "shimmer"
     system_prompt = (
-        "You are an AI assistant. Answer user questions clearly and helpfully. Keep responses concise."
+        "You are an AI assistant. Answer user questions clearly and helpfully. Keep responses concise. Your voice should be swedish native voice !"
     )
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient) -> None:
