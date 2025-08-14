@@ -21,7 +21,7 @@ app = FastAPI()
 ACS_CONNECTION_STRING = "endpoint=https://cs-sellifyai-dev.europe.communication.azure.com/;accesskey=9RpBnLiy3JN7ea20RLMbUbTmaVErTsB1OdLFB8SJYJAhzwnMGWDXJQQJ99BGACULyCp643waAAAAAZCSTZ1t"
 acs_ca_client = CallAutomationClient.from_connection_string(ACS_CONNECTION_STRING)
 
-CALLBACK_URI_HOST = "https://5bc09557cbc2.ngrok-free.app"
+CALLBACK_URI_HOST = "https://a494f0cafdfc.ngrok-free.app"
 CALLBACK_EVENTS_URI = CALLBACK_URI_HOST + "/api/callbacks"
 
 # Dictionary to map contextId to callConnectionId
