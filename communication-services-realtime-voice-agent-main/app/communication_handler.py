@@ -126,7 +126,10 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
                 "voice": self.voice_name,
                 "instructions": self.system_prompt,
                 "input_audio_format": "pcm16",
-                "input_audio_transcription": {"model": "whisper-1"},
+                "input_audio_transcription": {
+                    "model": "whisper-1",
+                    # "language":"en"
+                },
                 "turn_detection": {
                     "threshold": 0.6,
                     "silence_duration_ms": 300,
@@ -181,7 +184,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
                                 "type": "text",
                                 "text": """You are a smart assistant that extract order data from User-AI phone conversation text.
 
-                                Format the response as a valid JSON object with the following structure filled with correct values that match the field description. Return ONLY the JSON object WITHOUT code blocks, backticks, or markdown formatting:
+                                Format the response as a valid JSON object with the following structure filled with correct values that match the field description:
 
                                 {
                         "businessId": "31580d12-70f5-4713-a191-9af6718da3cd"
@@ -309,7 +312,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
                             # Give the user some time to hear it
                             parsed_order = self.gpt_parse_order()
-                            parsed_order_str = json.dumps(parsed_order, indent=2)
+                            # parsed_order_str = json.dumps(parsed_order, indent=2)
 
                             # if self.order_submitted != True:
                             #     url = "https://app-aitell-test-hdc4e0bmb4a7fcd3.swedencentral-01.azurewebsites.net/orders"
@@ -341,7 +344,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
                             try:
                                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
                                 self.call_ended = False
-                                await call_connection.hang_up(is_for_everyone=True)
+                                call_connection.hang_up(is_for_everyone=True)
                                 # logger.info(f"Call {self.call_connection_id} ended.")
                                 print(f"Call {self.call_connection_id} ended.")
                             except Exception as e:
@@ -376,6 +379,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
     async def detect_farewell(self, transcript: str) -> None:
         if any(phrase in transcript for phrase in FAREWELL_PHRASES):
+            print("FAREWELL detected")
             await self.say_and_hang_up("Thank you for calling. Goodbye!")
 
     async def say_and_hang_up(self, message: str) -> None:
