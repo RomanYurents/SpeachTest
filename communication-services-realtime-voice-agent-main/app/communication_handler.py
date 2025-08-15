@@ -1,12 +1,16 @@
 import json
 import os
 import uuid
+from typing import List
+
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 from azure.core.credentials import AzureKeyCredential
 import asyncio
-#from aiologger import Logger
+
+from pydantic import BaseModel, Field
+# from aiologger import Logger
 from rtclient import (
     InputTextContentPart,
     ItemCreateMessage,
@@ -23,7 +27,7 @@ import requests
 
 load_dotenv()
 
-#logger = Logger.with_default_handlers()
+# logger = Logger.with_default_handlers()
 
 # Azure OpenAI Realtime environment variables
 AZURE_OPENAI_REALTIME_ENDPOINT = "https://oai-sellifyai.openai.azure.com/openai/"
@@ -34,10 +38,8 @@ AZURE_OPENAI_REALTIME_DEPLOYMENT_MODEL_NAME = "gpt-4o-mini-realtime-preview"
 FAREWELL_PHRASES = [
     "thanks, that's all",
     "thank you, bye",
-    "thank you",
     "bye",
     "goodbye",
-    "that's all",
     "see you",
     "talk to you later",
     "tack, det var allt",
@@ -54,14 +56,50 @@ FAREWELL_PHRASES = [
     "vi pratar senare"
 ]
 
+
 class CommunicationHandler:
     order_text = ""
     order_submitted = False
     closed_request_id = ""
     voice_name = "shimmer"
-    system_prompt = (
-        "*** Menu: Cesar $3.5, Carbonara $5, Risotto $4 *** You are an AI assistant that takes menu order from client by phone. You need to ask user if he want to order something. If yes you should tell about menu and wait for user order. Then ask for amount of portions if needed. Take pause. After user select dishes and quantity of portions for each dish you need to ask about full name of client. Take pause. Ask about clients phone number. Take pause. Ask about clients address. Take pause. Then you should ask if user has any specific notes or instructions. Answer user questions clearly and helpfully. You can ask additional questions if you see client spelling or data seems not correct (e.x. bad user pronounciation or voice that cause mistakes.) Keep responses concise. you should use short sentences. Use quick check-ins like “Does that make sense?” or “Shall I keep going?” every few sentences. Use Small fillers like “Okay, so…”, “Right…”, “Let’s see…”. You are a friendly AI assistant speaking live over a call. Keep responses under two sentences at a time. Use a conversational tone and natural pauses. Ask brief check-in questions to confirm understanding. Avoid long monologues — instead, speak as if you are ready to be interrupted at any moment. Your voice should be English native voice !"
-    )
+    system_prompt = """"
+[ROLE AND GOAL]
+You are a friendly AI assistant designed to take food orders over a live phone call for a restaurant. 
+Your primary goal is to accurately and efficiently capture the customer's order and delivery details while maintaining a pleasant, conversational tone. 
+Your persona is that of a helpful and efficient order-taker with a native English-speaking voice.
+
+[CONTEXT]
+You have the following menu available:
+- Cesar Salad: $3.50
+- Carbonara Pasta: $5.00
+- Mushroom Risotto: $4.00
+
+[ALGORITHM OF ACTIONS]
+Follow this sequence step-by-step. Take a natural pause between each step to allow the user to respond.
+
+Initiate: Start the conversation by greeting the user and asking if they would like to place an order.
+Present Menu: If they say yes, present the menu items and their prices.
+Take Food Order: Listen to the user's selection. For each dish they choose, you must ask for the quantity (number of portions) if they don't specify it.
+Confirm Food Order: After they have selected all their dishes, briefly summarize the food order for confirmation (e.g., "Okay, so that's one Cesar and two Carbonaras. Is that correct?").
+Ask for Name IMPORTANT: After a brief pause, ask for the client's full name.
+Ask for Phone Number: After another brief pause, ask for their phone number.
+Ask for Address: After another brief pause, ask for their delivery address.
+Ask for Special Instructions: Finally, ask if they have any special notes or instructions for their order.
+Conclude: End the call by confirming the order and user info and thanking the user.
+
+[TONE AND STYLE OF COMMUNICATION]
+Conversational Tone: Be friendly and natural.
+Concise Responses: Keep your responses short, ideally under two sentences at a time. Avoid long monologues.
+Natural Pacing: Speak as if you are on a live call. Use natural pauses between sentences and be ready to be interrupted at any moment.
+Small Fillers: Use small, natural fillers to make the conversation flow, such as "Okay, so...", "Right...", "Let’s see...".
+Check-ins: After a few sentences, use brief check-in questions to ensure the user is following along, like "Does that sound right?" or "Shall I continue?".
+
+[IMPORTANT]
+- If you are unsure about ANY information the user provides—such as a mispronounced name, an unclear address, or an ambiguous order—you MUST ask for clarification. Do not guess or proceed with potentially incorrect data.
+Example for spelling: "I'm sorry, I didn't quite catch that. Could you please spell the street name for me?"
+Example for quantity: "Just to be sure, did you say two portions of Risotto?"
+Example for an unclear word: "My apologies, could you repeat that last part for me?"  
+    """
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient) -> None:
         self.rt_client = None
@@ -120,10 +158,10 @@ class CommunicationHandler:
             if self.active_websocket.client_state == WebSocketState.CONNECTED:
                 await self.active_websocket.send_text(message)
         except Exception as e:
-            #logger.error(f"Send Message - Failed to send message: {e}")
+            # logger.error(f"Send Message - Failed to send message: {e}")
             print((f"Send Message - Failed to send message: {e}"))
             raise e
-        
+
     def gpt_parse_order(self) -> object:
         try:
             api_version = "2025-01-01-preview"
@@ -134,14 +172,14 @@ class CommunicationHandler:
                 api_key="1kjOqx7DUuB3TdDBcN1jlHL4PDARSXQHnuVmW0JefylAChtNiuBAJQQJ99BGACYeBjFXJ3w3AAAAACOGu2hd",
             )
 
-            chat_prompt =[
+            chat_prompt = [
                 {
                     "role": "system",
                     "content":
-                    [
-                        {
-                            "type": "text",
-                            "text": """You are a smart assistant that extract order data from User-AI phone conversation text.
+                        [
+                            {
+                                "type": "text",
+                                "text": """You are a smart assistant that extract order data from User-AI phone conversation text.
 
                                 Format the response as a valid JSON object with the following structure filled with correct values that match the field description. Return ONLY the JSON object WITHOUT code blocks, backticks, or markdown formatting:
 
@@ -170,8 +208,8 @@ class CommunicationHandler:
                         "status": "confirmed"
                         }
                     """
-                        }
-                    ]
+                            }
+                        ]
                 },
                 {
                     "role": "user",
@@ -186,17 +224,41 @@ class CommunicationHandler:
 
             messages = chat_prompt
 
+            class OrderItem(BaseModel):
+                name: str = Field(..., description="The name of dish from menu (e.g., Classic Caesar Salad)")
+                quantity: int = Field(..., description="Amount of portions from conversation")
+                unitPrice: float = Field(..., description="The price of dish from menu, always 2 digits after comma")
+                totalPrice: float = Field(..., description="The total price for this item, always 2 digits after comma")
+                category: str = Field(..., description="'Salat' or 'Main dish'")
+                notes: str = Field(..., description="Leave this field empty string")
+
+            class OrderData(BaseModel):
+                businessId: str = Field(..., description="Unique business ID")
+                customerName: str = Field(..., description="The name of client from conversation")
+                customerPhone: str = Field(..., description="The phone number of client in format +1234567890")
+                customerEmail: str = Field(..., description="Always 'customer@gmail.com'")
+                customerAddress: str = Field(..., description="The address of client from conversation")
+                orderItems: List[OrderItem] = Field(..., description="List of ordered items")
+                totalAmount: float = Field(...,
+                                           description="The sum of prices of all ordered dishes, always 2 digits after comma")
+                currency: str = Field(..., description="Currency, e.g., USD")
+                specialInstructions: str = Field(..., description="Leave this field empty string")
+                estimatedCompletionTime: str = Field(..., description="Leave this field empty string")
+                paymentMethod: str = Field(..., description="Payment method, e.g., card")
+                source: str = Field(..., description="Order source, e.g., web")
+                status: str = Field(..., description="Order status, e.g., confirmed")
+
             # Generate the completion
-            completion = client.chat.completions.create(
+            completion = client.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=16384,
                 temperature=0,
                 top_p=0.95,
-                frequency_penalty=0, # punishment for repetition
-                presence_penalty=0, # punishment for theme
+                frequency_penalty=0,  # punishment for repetition
+                presence_penalty=0,  # punishment for theme
                 stop=None,
-                stream=False # False - if we won't use chat
+                response_format=OrderData
             )
 
             # for update in completion:
@@ -205,13 +267,13 @@ class CommunicationHandler:
 
             client.close()
 
-            return json.loads(completion.choices[0].message.content)
-        
+            # return completion.choices[0].message.parsed #Pydantic model
+            return json.loads(completion.choices[0].message.content)  # Json response
+
         except Exception as e:
-            #logger.error(f"GPT Parse Order - Failed to parse order: {e}")
+            # logger.error(f"GPT Parse Order - Failed to parse order: {e}")
             print(f"GPT Parse Order - Failed to parse order: {e}")
             raise e
-
 
     async def receive_messages_async(self) -> None:
         try:
@@ -224,13 +286,13 @@ class CommunicationHandler:
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
-                        self.order_text += user_message + " " 
+                        self.order_text += user_message + " "
                         print(user_message)
                         await self.detect_farewell(transcript)
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
-                        self.order_text += ai_message + " " 
+                        self.order_text += ai_message + " "
                         print(ai_message)
 
                     case "response.audio.delta":
@@ -238,7 +300,7 @@ class CommunicationHandler:
 
                     case "response.done":
                         print(f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
-                         # If we've marked the call for end, now send ResponseCreateMessage and hang up
+                        # If we've marked the call for end, now send ResponseCreateMessage and hang up
                         if self.call_ended:
                             # logger.info(self.order_text)
                             # print(self.order_text)
@@ -272,8 +334,7 @@ class CommunicationHandler:
 
                             print("Order endpoint status code:", response.status_code)
 
-                            #self.order_submitted = True
-
+                            # self.order_submitted = True
 
                             await asyncio.sleep(3)
 
