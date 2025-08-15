@@ -14,15 +14,15 @@ from azure.communication.callautomation import (
 from app.communication_handler import CommunicationHandler
 from loguru import logger
 from urllib.parse import urlencode, urlparse, urlunparse
+import os
+from dotenv import load_dotenv
 
 app = FastAPI()
 
-# ACS setup
-ACS_CONNECTION_STRING = "endpoint=https://cs-sellifyai-dev.europe.communication.azure.com/;accesskey=9RpBnLiy3JN7ea20RLMbUbTmaVErTsB1OdLFB8SJYJAhzwnMGWDXJQQJ99BGACULyCp643waAAAAAZCSTZ1t"
-acs_ca_client = CallAutomationClient.from_connection_string(ACS_CONNECTION_STRING)
+load_dotenv()
 
-CALLBACK_URI_HOST = "https://66f055b96655.ngrok-free.app"
-CALLBACK_EVENTS_URI = CALLBACK_URI_HOST + "/api/callbacks"
+# ACS setup
+acs_ca_client = CallAutomationClient.from_connection_string(os.getenv("ACS_CONNECTION_STRING"))
 
 # Dictionary to map contextId to callConnectionId
 context_to_call_id = {}
@@ -30,7 +30,7 @@ context_to_call_id = {}
 
 @app.get("/")
 async def root():
-    return JSONResponse({"message": "AI Voice Assistant is running."})
+    return JSONResponse({"message": "AI Voice Assistant is running. Pre-demo version"})
 
 
 @app.post("/api/incomingCall")
@@ -49,8 +49,8 @@ async def incoming_call_handler(request: Request):
             guid = str(uuid.uuid4())
 
             query_params = urlencode({"callerId": caller_id, "contextId": guid})
-            callback_uri = f"{CALLBACK_EVENTS_URI}/{guid}?{query_params}"
-            parsed_url = urlparse(CALLBACK_URI_HOST)
+            callback_uri = f"{os.getenv("CALLBACK_URI_HOST")}/api/callbacks/{guid}?{query_params}"
+            parsed_url = urlparse(os.getenv("CALLBACK_URI_HOST"))
             websocket_url = urlunparse(("wss", parsed_url.netloc, "/ws", "", "", "")) + f"?contextId={guid}"
 
             media_options = MediaStreamingOptions(
@@ -101,14 +101,12 @@ async def ws(websocket: WebSocket):
     while True:
         try:
             data = await websocket.receive_json()
-
             if data.get("kind") == "AudioData":
                 audio_data = data["audioData"]["data"]
                 await service.send_audio_async(audio_data)
         except Exception as e:
             logger.error(f"WebSocket closed: {e}")
             break
-
 
 
 # if __name__ == "__main__":

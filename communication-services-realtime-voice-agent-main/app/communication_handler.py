@@ -1,15 +1,11 @@
 import json
 import os
 import uuid
-from typing import List
-
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 from azure.core.credentials import AzureKeyCredential
 import asyncio
-
-from pydantic import BaseModel, Field
 # from aiologger import Logger
 from rtclient import (
     InputTextContentPart,
@@ -24,15 +20,12 @@ from rtclient import (
 from azure.communication.callautomation import CallAutomationClient
 from openai import AzureOpenAI
 import requests
+from typing import List
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
 # logger = Logger.with_default_handlers()
-
-# Azure OpenAI Realtime environment variables
-AZURE_OPENAI_REALTIME_ENDPOINT = "https://oai-sellifyai.openai.azure.com/openai/"
-AZURE_OPENAI_REALTIME_SERVICE_KEY = "DkrrkVjmBb6ce8fbDcexApHXQoQ0cef3mh7Jumll2lZC35OHqGisJQQJ99BGACfhMk5XJ3w3AAABACOG1JST"
-AZURE_OPENAI_REALTIME_DEPLOYMENT_MODEL_NAME = "gpt-4o-mini-realtime-preview"
 
 # Farewell detection list
 FAREWELL_PHRASES = [
@@ -110,9 +103,9 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
     async def start_conversation_async(self) -> None:
         self.rt_client = RTLowLevelClient(
-            url=AZURE_OPENAI_REALTIME_ENDPOINT,
-            key_credential=AzureKeyCredential(AZURE_OPENAI_REALTIME_SERVICE_KEY),
-            azure_deployment=AZURE_OPENAI_REALTIME_DEPLOYMENT_MODEL_NAME,
+            url=os.getenv("AZURE_OPENAI_REALTIME_ENDPOINT"),
+            key_credential=AzureKeyCredential(os.getenv("AZURE_OPENAI_REALTIME_SERVICE_KEY")),
+            azure_deployment=os.getenv("AZURE_OPENAI_REALTIME_DEPLOYMENT_MODEL_NAME"),
         )
         try:
             await self.rt_client.connect()
@@ -128,7 +121,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
                 "input_audio_format": "pcm16",
                 "input_audio_transcription": {
                     "model": "whisper-1",
-                    # "language":"en"
+                    # "language": "en"
                 },
                 "turn_detection": {
                     "threshold": 0.6,
@@ -171,8 +164,8 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
             client = AzureOpenAI(
                 api_version=api_version,
-                azure_endpoint="https://aiftestroman1.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview",
-                api_key="1kjOqx7DUuB3TdDBcN1jlHL4PDARSXQHnuVmW0JefylAChtNiuBAJQQJ99BGACYeBjFXJ3w3AAAAACOGu2hd",
+                azure_endpoint=os.getenv("AZURE_OPENAI_GPT4OMINI_ENDPOINT"),
+                api_key=os.getenv("AZURE_OPENAI_GPT4OMINI_API_KEY"),
             )
 
             chat_prompt = [
@@ -270,8 +263,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
             client.close()
 
-            # return completion.choices[0].message.parsed #Pydantic model
-            return json.loads(completion.choices[0].message.content)  # Json response
+            return json.loads(completion.choices[0].message.content)
 
         except Exception as e:
             # logger.error(f"GPT Parse Order - Failed to parse order: {e}")
@@ -327,9 +319,9 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
 
                             #     self.order_submitted = True
 
-                            url = "https://app-aitell-test-hdc4e0bmb4a7fcd3.swedencentral-01.azurewebsites.net/orders"
+                            url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
                             headers = {
-                                "x-api-key": "ac7d13c4-db2c-4bf0-87bb-205e03b34ea6",
+                                "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
                                 "Content-Type": "application/json"
                             }
 
