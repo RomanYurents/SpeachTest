@@ -26,6 +26,7 @@ acs_ca_client = CallAutomationClient.from_connection_string(os.getenv("ACS_CONNE
 
 # Dictionary to map contextId to callConnectionId
 context_to_call_id = {}
+context_store = {}
 
 
 @app.get("/")
@@ -45,8 +46,12 @@ async def incoming_call_handler(request: Request):
         elif event.event_type == "Microsoft.Communication.IncomingCall":
             caller_id = event.data["from"]["phoneNumber"]["value"] if event.data["from"]["kind"] == "phoneNumber" else \
             event.data["from"]["rawId"]
+            callee_id = event.data["to"]["phoneNumber"]["value"] if event.data["from"]["kind"] == "phoneNumber" else \
+                event.data["from"]["rawId"]
             incoming_call_context = event.data["incomingCallContext"]
             guid = str(uuid.uuid4())
+
+            print(f"Call info: {caller_id} ➝ {callee_id}")
 
             query_params = urlencode({"callerId": caller_id, "contextId": guid})
             callback_uri = f"{os.getenv("CALLBACK_URI_HOST")}/api/callbacks/{guid}?{query_params}"
@@ -73,6 +78,11 @@ async def incoming_call_handler(request: Request):
             logger.info(f"Answered call with ID: {answer_result.call_connection_id} for contextId: {guid}")
             # Store call_connection_id using contextId
             context_to_call_id[guid] = answer_result.call_connection_id
+            context_store[guid] = {
+                "call_connection_id": answer_result.call_connection_id,
+                "caller_id": caller_id,
+                "callee_id": callee_id,
+            }
 
             return JSONResponse({"message": "Call answered."})
 
@@ -93,9 +103,15 @@ async def ws(websocket: WebSocket):
 
     # Extract contextId from WebSocket query params
     context_id = websocket.query_params.get("contextId")
-    call_id = context_to_call_id.get(context_id)
+    call_info = context_store.get(context_id, {})
 
-    service = CommunicationHandler(websocket, call_id, acs_ca_client)
+    caller_id = call_info.get("caller_id")
+    callee_id = call_info.get("callee_id")
+    call_id = call_info.get("call_connection_id")
+
+    logger.info(f"Starting WS session for Call ID: {call_id}, Callee: {callee_id}")
+
+    service = CommunicationHandler(websocket, call_id, acs_ca_client, call_id)
     await service.start_conversation_async()
 
     while True:

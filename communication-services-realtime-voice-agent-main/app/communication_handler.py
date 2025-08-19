@@ -1,11 +1,17 @@
+import asyncio
 import json
 import os
 import uuid
+from typing import List
+
+import requests
+from azure.communication.callautomation import CallAutomationClient
+from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
-from azure.core.credentials import AzureKeyCredential
-import asyncio
+from openai import AzureOpenAI
+from pydantic import BaseModel, Field
 # from aiologger import Logger
 from rtclient import (
     InputTextContentPart,
@@ -17,11 +23,8 @@ from rtclient import (
     UserMessageItem,
     InputAudioBufferAppendMessage,
 )
-from azure.communication.callautomation import CallAutomationClient
-from openai import AzureOpenAI
-import requests
-from typing import List
-from pydantic import BaseModel, Field
+
+from app.business_context import BusinessContextManager
 
 load_dotenv()
 
@@ -55,77 +58,38 @@ class CommunicationHandler:
     order_submitted = False
     closed_request_id = ""
     voice_name = "shimmer"
-    system_prompt = """"
+    system_prompt = """
 [ROLE AND GOAL]
-You are a friendly AI assistant designed to take food orders over a live phone call for a restaurant. 
-Your primary goal is to accurately and efficiently capture the customer's order and delivery details while maintaining a pleasant, conversational tone. 
-Your persona is that of a helpful and efficient order-taker with a native English-speaking voice.
-
-[CONTEXT]
-You have the following menu available:
-- Cesar Salad: $3.50
-- Carbonara Pasta: $5.00
-- Mushroom Risotto: $4.00
-
-[ALGORITHM OF ACTIONS]
-Follow this sequence step-by-step. Take a natural pause between each step to allow the user to respond.
-
-Initiate: Start the conversation by greeting the user and asking if they would like to place an order.
-Present Menu: If they say yes, present the menu items and their prices.
-Take Food Order: Listen to the user's selection. For each dish they choose, you must ask for the quantity (number of portions) if they don't specify it.
-Confirm Food Order: After they have selected all their dishes, briefly summarize the food order for confirmation (e.g., "Okay, so that's one Cesar and two Carbonaras. Is that correct?").
-Ask for Name IMPORTANT: After a brief pause, ask for the client's full name.
-Ask for Phone Number: After another brief pause, ask for their phone number.
-Ask for Address: After another brief pause, ask for their delivery address.
-Ask for Special Instructions: Finally, ask if they have any special notes or instructions for their order.
-Conclude: End the call by confirming the order and user info and thanking the user.
-
-[ALGORITHM OF ACTIONS]
-Follow this sequence step-by-step. Take a natural pause between each step to allow the user to respond.
-1.  Initiate: Start with a friendly greeting and ask if the customer would like to place an order.
-    - **Example:** "Hi there! Thanks for calling. Can I help you with an order today?"
-2.  Present Menu: If they confirm, present the menu and prices.
-    - **Example:** "Okay, so our menu includes the Cesar Salad, Carbonara Pasta, and Mushroom Risotto. What would you like to have?"
-3.  Take Order: Listen to their food selection. If the quantity isn't specified, ask for it.
-    - **Example:** "Right, and how many portions of the Carbonara would that be?"
-4.  Confirm Order: Summarize the order for confirmation.
-    - **Example:** "Just to be clear, that's one Cesar Salad and two Carbonaras. Is that correct?"
-5.  Get Details:
-    - Ask for their full name.
-        - **Example:** "Okay, so now I just need a few details. What's your full name, please?"
-    - Ask for their phone number.
-        - **Example:** "Got it. And what's the phone number for the delivery?"
-    - Ask for their delivery address.
-        - **Example:** "And finally, what's the address for the delivery?"
-6.  Instructions: Ask about any special instructions.
-    - **Example:** "Let's see... Do you have any special notes for your order?"
-7.  Final Confirmation & Conclude: Reiterate the entire order (food items, quantities), delivery details, and thank the customer.
-    - **Example:** "Okay, so just to confirm everything: that's one Cesar Salad and two Carbonara Pastas. The delivery will go to [Address] under the name [Name]. Does all of that sound correct?"
-    - **Example (якщо клієнт підтверджує):** "Perfect, thanks so much for your order! We'll get that prepared right away. Have a great day!"
-
-[TONE AND STYLE OF COMMUNICATION]
-Conversational Tone: Be friendly and natural.
-Concise Responses: Keep your responses short, ideally under two sentences at a time. Avoid long monologues.
-Natural Pacing: Use natural pauses between sentences and be ready to be interrupted at any moment.
-Small Fillers: Use conversational markers like "Okay, so...", "Right...", "Let's see...", "Sounds good!".
-Check-ins: After a few sentences, use brief check-in questions to ensure the user is following along, like "Does that sound right?" or "Shall I continue?".
-
-
-[IMPORTANT]
-- If you are unsure about ANY information the user provides—such as a mispronounced name, an unclear address, or an ambiguous order—you MUST ask for clarification. Do not guess or proceed with potentially incorrect data.
-Example for spelling: "I'm sorry, I didn't quite catch that. Could you please spell the street name for me?"
-Example for quantity: "Just to be sure, did you say two portions of Risotto?"
-Example for an unclear word: "My apologies, could you repeat that last part for me?"  
+You are a friendly AI assistant designed to take calls. Please assist the caller as best you can.
     """
 
-    def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient) -> None:
+    def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient,
+                 phone_number: str = None) -> None:
         self.rt_client = None
         self.active_websocket = websocket
         self.call_connection_id = call_connection_id
         self.acs_client = acs_client
         self.call_ended = False  # Prevent double hangup
+        self.phone_number = phone_number
+        self.business_context = None
+
+    async def initialize_business_context(self) -> None:
+        """Initialize business context by phone number"""
+        if self.phone_number:
+            async with BusinessContextManager() as service:
+                self.business_context, self.system_prompt = await service.get_context_and_prompt(
+                    self.phone_number
+                )
+                print(f"Initialized context for phone: {self.phone_number}")
+                if self.business_context:
+                    print(f"Business: {self.business_context.name}")
+                    print(f"Is open: {self.business_context.is_open}")
+        else:
+            print("No phone number provided, using default prompt")
 
     async def start_conversation_async(self) -> None:
+        await self.initialize_business_context()
+
         self.rt_client = RTLowLevelClient(
             url=os.getenv("AZURE_OPENAI_REALTIME_ENDPOINT"),
             key_credential=AzureKeyCredential(os.getenv("AZURE_OPENAI_REALTIME_SERVICE_KEY")),
@@ -165,8 +129,7 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
             text="Hello! I am your AI assistant. How can I help you today?"
         )
         initial_message = ItemCreateMessage(
-            item=UserMessageItem(content=[content_part]),
-            call_id=self.conversation_call_id
+            item=UserMessageItem(content=[content_part])
         )
         await self.rt_client.send(message=initial_message)
         await self.rt_client.send(ResponseCreateMessage())
@@ -301,7 +264,13 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
                 if message is None or self.rt_client.ws.closed:
                     continue
 
+                # print(f"Received message of type: {message.type}")
+
                 match message.type:
+                    case "input_audio_buffer.speech_started":
+                        print("Detected speech started.")
+                    case "input_audio_buffer.speech_stopped":
+                        print("Detected speech started.")
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
@@ -406,7 +375,6 @@ Example for an unclear word: "My apologies, could you repeat that last part for 
         # Send final goodbye message
         content_part = InputTextContentPart(text=message)
         final_message = ItemCreateMessage(
-            item=UserMessageItem(content=[content_part]),
-            call_id=self.conversation_call_id
+            item=UserMessageItem(content=[content_part])
         )
         await self.rt_client.send(message=final_message)
