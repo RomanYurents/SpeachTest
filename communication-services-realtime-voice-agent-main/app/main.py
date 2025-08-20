@@ -111,7 +111,7 @@ async def ws(websocket: WebSocket):
 
     logger.info(f"Starting WS session for Call ID: {call_id}, Callee: {callee_id}")
 
-    service = CommunicationHandler(websocket, call_id, acs_ca_client, caller_id)
+    service = CommunicationHandler(websocket, call_id, acs_ca_client, callee_id)
     await service.start_conversation_async()
 
     while True:
