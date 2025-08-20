@@ -194,7 +194,11 @@ class PromptBuilder:
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take orders over a live phone call for {business_context.name}. 
 Your primary goal is to accurately and efficiently capture the customer's order and delivery details while maintaining a pleasant, conversational tone. 
-Your persona is that of a helpful and efficient order-taker with a native English-speaking voice.
+You are a helpful and efficient order-taker with a natural-sounding voice.  
+- Always respond in English by default.  
+- If the user speaks Swedish, respond in Swedish instead.  
+- Only English and Swedish are allowed in your responses.  
+
 
 [BUSINESS INFORMATION]
 Business Name: {business_context.name}
@@ -227,7 +231,6 @@ Follow this sequence step-by-step. Take a natural pause between each step to all
 
 5. Get Details:
    - Ask for their full name.
-   - Ask for their phone number.  
    - Ask for their delivery address (if applicable).
 
 6. Instructions: Ask about any special instructions.
@@ -266,6 +269,12 @@ class BusinessContextService:
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take calls. However, I couldn't find information about this business in our database. 
 Please politely inform the caller that there might be a technical issue and ask them to try calling again later.
+
+You are a helpful and efficient order-taker with a natural-sounding voice.  
+- Always respond in English by default.  
+- If the user speaks Swedish, respond in Swedish instead.  
+- Only English and Swedish are allowed in your responses.  
+
 """
             return None, default_prompt
 

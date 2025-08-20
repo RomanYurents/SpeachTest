@@ -4,13 +4,14 @@ import os
 import uuid
 from typing import List
 
+import httpx
 import requests
 from azure.communication.callautomation import CallAutomationClient
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
-from openai import AzureOpenAI
+from openai import AzureOpenAI, AsyncAzureOpenAI
 from pydantic import BaseModel, Field
 # from aiologger import Logger
 from rtclient import (
@@ -64,13 +65,14 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
     """
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient,
-                 phone_number: str = None) -> None:
+                 phone_number: str = None, customer_phone: str = None) -> None:
         self.rt_client = None
         self.active_websocket = websocket
         self.call_connection_id = call_connection_id
         self.acs_client = acs_client
         self.call_ended = False  # Prevent double hangup
         self.phone_number = phone_number
+        self.customer_phone = customer_phone
         self.business_context = None
 
     async def initialize_business_context(self) -> None:
@@ -145,11 +147,11 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             print((f"Send Message - Failed to send message: {e}"))
             raise e
 
-    def gpt_parse_order(self) -> object:
+    async def gpt_parse_order(self) -> object:
         try:
             api_version = "2025-01-01-preview"
 
-            client = AzureOpenAI(
+            client = AsyncAzureOpenAI(
                 api_version=api_version,
                 azure_endpoint=os.getenv("AZURE_OPENAI_GPT4OMINI_ENDPOINT"),
                 api_key=os.getenv("AZURE_OPENAI_GPT4OMINI_API_KEY"),
@@ -163,31 +165,24 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                             {
                                 "type": "text",
                                 "text": """You are a smart assistant that extract order data from User-AI phone conversation text.
-
-                                Format the response as a valid JSON object with the following structure filled with correct values that match the field description:
-
-                                {
-                        "customerName": "The name of client from conversation",
-                        "customerPhone": "The phone number of client from conversation in format +1234567890",
-                        "customerEmail": "Always 'customer@gmail.com'",
-                        "customerAddress": "The address of client from conversation",
-                        "orderItems": [
-                            {
-                            "name": "The name of dish from menu (e.x. Classic Caesar Salad, string value)",
-                            "quantity": "Amount of portions from conversation (integer number)",
-                            "unitPrice": "The price of dish from menu (e.x. 5.00, decimal value, always 2 digits after comma)",
-                            "totalPrice": "The price of dish from menu (e.x. 5.00, decimal value, always 2 digits after comma)",
-                            "category": "'Salat' or 'Main dish' (string value)",
-                            "notes": "Leave this field empty string"
-                            }
-                        ],
-                        "totalAmount": "The sum of prices of all ordered dishes (e.x. 25.00, decimal value, always 2 digits after comma)",
-                        "currency": "USD",
-                        "specialInstructions": "Leave this field empty string",
-                        "estimatedCompletionTime": "Leave this field empty string",
-                        "paymentMethod": "card",
-                        "source": "web",
-                        "status": "confirmed"
+Return your answer as a JSON object with the following fields:
+- customerName: the client's name from the conversation
+- customerEmail: use the fixed value "customer@gmail.com"
+- customerAddress: the client's address from the conversation
+- orderItems: list of ordered dishes, each containing:
+   • name: dish name (e.g., Classic Caesar Salad)
+   • quantity: number of portions
+   • unitPrice: price of one portion (decimal, 2 digits after the comma)
+   • totalPrice: total price for this item (decimal, 2 digits after the comma)
+   • category: either "Salat" or "Main dish"
+   • notes: leave as empty string
+- totalAmount: sum of all ordered items, decimal with 2 digits after the comma
+- currency: use "USD"
+- specialInstructions: leave as empty string
+- estimatedCompletionTime: leave as empty string
+- paymentMethod: use "card"
+- source: use "web"
+- status: use "confirmed"
                         }
                     """
                             }
@@ -230,7 +225,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 status: str = Field(..., description="Order status, e.g., confirmed")
 
             # Generate the completion
-            completion = client.chat.completions.parse(
+            completion = await client.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=16384,
@@ -246,10 +241,11 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             #     if update.choices:
             #         print(update.choices[0].delta.content or "", end="")
 
-            client.close()
+            await client.close()
 
             result = json.loads(completion.choices[0].message.content)
             result['businessId'] = str(self.business_context.id)
+            result['customerPhone'] = self.customer_phone
 
             return result
 
@@ -293,39 +289,8 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                         if self.call_ended:
                             # logger.info(self.order_text)
                             # print(self.order_text)
-                            await asyncio.sleep(1)  # Give it a moment to flush the audio
-                            await self.rt_client.send(ResponseCreateMessage())
-
-                            # Give the user some time to hear it
-                            parsed_order = self.gpt_parse_order()
-                            # parsed_order_str = json.dumps(parsed_order, indent=2)
-
-                            # if self.order_submitted != True:
-                            #     url = "https://app-aitell-test-hdc4e0bmb4a7fcd3.swedencentral-01.azurewebsites.net/orders"
-                            #     headers = {
-                            #         "x-api-key": "ac7d13c4-db2c-4bf0-87bb-205e03b34ea6",
-                            #         "Content-Type": "application/json"
-                            #     }
-
-                            #     response = requests.post(url, json=parsed_order, headers=headers)
-
-                            #     print("Order endpoint status code:", response.status_code)
-
-                            #     self.order_submitted = True
-
-                            url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
-                            headers = {
-                                "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
-                                "Content-Type": "application/json"
-                            }
-
-                            response = requests.post(url, json=parsed_order, headers=headers)
-
-                            print("Order endpoint status code:", response.status_code)
-
-                            # self.order_submitted = True
-
-                            await asyncio.sleep(3)
+                            # await asyncio.sleep(1)  # Give it a moment to flush the audio
+                            # await self.rt_client.send(ResponseCreateMessage())
 
                             try:
                                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
@@ -337,6 +302,36 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                                 # logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
                                 print(f"Failed to hang up call {self.call_connection_id}: {e}")
 
+                            # Give the user some time to hear it
+                            if self.business_context:
+                                parsed_order = await self.gpt_parse_order()
+
+                                # parsed_order_str = json.dumps(parsed_order, indent=2)
+
+                                # if self.order_submitted != True:
+                                #     url = "https://app-aitell-test-hdc4e0bmb4a7fcd3.swedencentral-01.azurewebsites.net/orders"
+                                #     headers = {
+                                #         "x-api-key": "ac7d13c4-db2c-4bf0-87bb-205e03b34ea6",
+                                #         "Content-Type": "application/json"
+                                #     }
+
+                                #     response = requests.post(url, json=parsed_order, headers=headers)
+
+                                #     print("Order endpoint status code:", response.status_code)
+
+                                #     self.order_submitted = True
+
+                                url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
+                                headers = {
+                                    "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
+                                    "Content-Type": "application/json"
+                                }
+
+                                async with httpx.AsyncClient() as client:
+                                    response = await client.post(url, json=parsed_order, headers=headers)
+                                    print("Order endpoint status code:", response.status_code)
+
+                            # self.order_submitted = True
                     case "error":
                         print(f"Error: {message.error}")
         except Exception as e:
