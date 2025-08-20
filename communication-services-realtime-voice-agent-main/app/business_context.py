@@ -21,7 +21,7 @@ Base = declarative_base()
 class Business(Base):
     __tablename__ = 'businesses'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     address = Column(String(500))
@@ -35,6 +35,7 @@ class Business(Base):
 
 @dataclass
 class BusinessContext:
+    id: str
     name: str
     description: str
     address: str
@@ -46,6 +47,7 @@ class BusinessContext:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            'id': self.id,
             'name': self.name,
             'description': self.description,
             'address': self.address,
@@ -108,6 +110,7 @@ class DatabaseManager:
                     )
 
                     business_context = BusinessContext(
+                        id=business.id,
                         name=business.name,
                         description=business.description or "",
                         address=business.address or "",
@@ -283,20 +286,20 @@ class BusinessContextManager:
             await self.service.close()
 
 
-async def test():
-    async with BusinessContextManager() as service:
-        phone_number = "+1-555-0123"
-
-        business_context, system_prompt = await service.get_context_and_prompt(phone_number)
-
-        if business_context:
-            print(f"Founded business: {business_context.name}")
-            print(f"Opened now: {business_context.is_open}")
-            print("\nGenerated prompt:")
-            print(system_prompt)
-        else:
-            print("Not found")
-
-
-if __name__ == "__main__":
-    asyncio.run(test())
+# async def test():
+#     async with BusinessContextManager() as service:
+#         phone_number = "+1-555-0123"
+#
+#         business_context, system_prompt = await service.get_context_and_prompt(phone_number)
+#
+#         if business_context:
+#             print(f"Founded business: {business_context.name}")
+#             print(f"Opened now: {business_context.is_open}")
+#             print("\nGenerated prompt:")
+#             print(system_prompt)
+#         else:
+#             print("Not found")
+#
+#
+# if __name__ == "__main__":
+#     asyncio.run(test())

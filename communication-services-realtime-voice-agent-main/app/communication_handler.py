@@ -167,7 +167,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                                 Format the response as a valid JSON object with the following structure filled with correct values that match the field description:
 
                                 {
-                        "businessId": "31580d12-70f5-4713-a191-9af6718da3cd"
                         "customerName": "The name of client from conversation",
                         "customerPhone": "The phone number of client from conversation in format +1234567890",
                         "customerEmail": "Always 'customer@gmail.com'",
@@ -216,7 +215,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 notes: str = Field(..., description="Leave this field empty string")
 
             class OrderData(BaseModel):
-                businessId: str = Field(..., description="Unique business ID")
                 customerName: str = Field(..., description="The name of client from conversation")
                 customerPhone: str = Field(..., description="The phone number of client in format +1234567890")
                 customerEmail: str = Field(..., description="Always 'customer@gmail.com'")
@@ -250,7 +248,10 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
 
             client.close()
 
-            return json.loads(completion.choices[0].message.content)
+            result = json.loads(completion.choices[0].message.content)
+            result['businessId'] = str(self.business_context.id)
+
+            return result
 
         except Exception as e:
             # logger.error(f"GPT Parse Order - Failed to parse order: {e}")
