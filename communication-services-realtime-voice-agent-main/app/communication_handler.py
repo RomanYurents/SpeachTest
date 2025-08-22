@@ -5,13 +5,12 @@ import uuid
 from typing import List
 
 import httpx
-import requests
 from azure.communication.callautomation import CallAutomationClient
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
-from openai import AzureOpenAI, AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI
 from pydantic import BaseModel, Field
 # from aiologger import Logger
 from rtclient import (
@@ -164,7 +163,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                         [
                             {
                                 "type": "text",
-                                "text": """You are a smart assistant that extract order data from User-AI phone conversation text.
+                                "text": f"""You are a smart assistant that extract order data from User-AI phone conversation text.
 Return your answer as a JSON object with the following fields:
 - customerName: the client's name from the conversation
 - customerEmail: use the fixed value "customer@gmail.com"
@@ -183,7 +182,8 @@ Return your answer as a JSON object with the following fields:
 - paymentMethod: use "card"
 - source: use "web"
 - status: use "confirmed"
-                        }
+
+Here are available services with prices {self.business_context.services}
                     """
                             }
                         ]

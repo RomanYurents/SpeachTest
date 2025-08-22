@@ -1,17 +1,17 @@
-import os
 import asyncio
 import json
+import os
+from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Optional, Dict, Any
-from dataclasses import dataclass
 
 import pytz
 from dotenv import load_dotenv
-from sqlalchemy import Column, Integer, String, Text, DateTime, func, JSON
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.future import select
+from sqlalchemy import Column, String, Text, DateTime, func, JSON, ForeignKey, Numeric, UUID
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.future import select
+from sqlalchemy.orm import declarative_base, relationship, selectinload
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ Base = declarative_base()
 class Business(Base):
     __tablename__ = 'businesses'
 
-    id = Column(String, primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     address = Column(String(500))
@@ -31,6 +31,43 @@ class Business(Base):
     operating_hours = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    categories = relationship(
+        "CatalogCategory",
+        back_populates="business",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+
+class CatalogCategory(Base):
+    __tablename__ = 'catalog_categories'
+
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    business_id = Column(UUID(as_uuid=True), ForeignKey('businesses.id', ondelete='CASCADE', onupdate='CASCADE'))
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+
+    business = relationship("Business", back_populates="categories")
+    items = relationship(
+        "CatalogItem",
+        back_populates="category_rel",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+
+class CatalogItem(Base):
+    __tablename__ = 'catalog_items'
+
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    business_id = Column(UUID(as_uuid=True), ForeignKey('businesses.id', ondelete='CASCADE', onupdate='CASCADE'))
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    price = Column(Numeric, nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey('catalog_categories.id', ondelete='CASCADE', onupdate='CASCADE'))
+
+    category_rel = relationship("CatalogCategory", back_populates="items")
 
 
 @dataclass
@@ -44,6 +81,7 @@ class BusinessContext:
     operating_hours: str
     phone: str
     is_open: bool = True
+    services: str = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -98,7 +136,10 @@ class DatabaseManager:
     async def get_business_by_phone(self, phone: str) -> Optional[BusinessContext]:
         try:
             async with self.async_session_factory() as session:
-                stmt = select(Business).where(Business.phone == phone)
+                stmt = select(Business).options(
+                    selectinload(Business.categories).selectinload(CatalogCategory.items)
+                ).where(Business.phone == phone)
+
                 result = await session.execute(stmt)
                 business = result.scalar_one_or_none()
 
@@ -109,6 +150,16 @@ class DatabaseManager:
                         else str(business.operating_hours)
                     )
 
+                    services_dict = {
+                        category.name: [item.title for item in category.items]
+                        for category in business.categories
+                    }
+
+                    services_str = "\n".join(
+                        f"{category}: {', '.join(items)}"
+                        for category, items in services_dict.items()
+                    )
+
                     business_context = BusinessContext(
                         id=business.id,
                         name=business.name,
@@ -117,7 +168,8 @@ class DatabaseManager:
                         city=business.city or "",
                         country=business.country or "",
                         operating_hours=operating_hours_str,
-                        phone=business.phone
+                        phone=business.phone,
+                        services=services_str
                     )
 
                     business_context.is_open = self._check_if_open(business_context.operating_hours)
@@ -202,10 +254,13 @@ You are a helpful and efficient order-taker with a natural-sounding voice.
 
 [BUSINESS INFORMATION]
 Business Name: {business_context.name}
-Services/Description: {business_context.description}
+Description: {business_context.description}
 Location: {business_context.address}, {business_context.city}, {business_context.country}
 Phone: {business_context.phone}
 Operating Hours: {business_context.operating_hours}
+
+Business provide only these services:
+{business_context.services}
 """
 
         if not business_context.is_open:
@@ -294,14 +349,14 @@ class BusinessContextManager:
         if self.service:
             await self.service.close()
 
-
 # async def test():
 #     async with BusinessContextManager() as service:
-#         phone_number = "+1-555-0123"
+#         phone_number = "+4570722984"
 #
 #         business_context, system_prompt = await service.get_context_and_prompt(phone_number)
 #
 #         if business_context:
+#             print(str(business_context.id))
 #             print(f"Founded business: {business_context.name}")
 #             print(f"Opened now: {business_context.is_open}")
 #             print("\nGenerated prompt:")
