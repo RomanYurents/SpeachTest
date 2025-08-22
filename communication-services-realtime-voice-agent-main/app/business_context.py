@@ -259,8 +259,10 @@ Location: {business_context.address}, {business_context.city}, {business_context
 Phone: {business_context.phone}
 Operating Hours: {business_context.operating_hours}
 
-Business provide only these services:
+Business provides ONLY these services, you MUST NOT invent or propose anything outside this list:
 {business_context.services}
+
+If the user requests something that is not in this list, politely refuse and clarify that the business only provides the listed services.
 """
 
         if not business_context.is_open:
