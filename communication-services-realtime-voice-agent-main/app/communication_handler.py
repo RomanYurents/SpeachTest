@@ -294,7 +294,7 @@ Here are available services with prices {self.business_context.services}
                         if self.call_ended:
                             # logger.info(self.order_text)
                             # print(self.order_text)
-                            # await asyncio.sleep(1)  # Give it a moment to flush the audio
+                            await asyncio.sleep(2)  # Give it a moment to flush the audio
                             # await self.rt_client.send(ResponseCreateMessage())
 
                             try:
