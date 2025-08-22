@@ -62,6 +62,8 @@ class CommunicationHandler:
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take calls. Please assist the caller as best you can.
     """
+    SILENCE_TIMEOUT = 10
+    silence_task: asyncio.Task | None = None
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient,
                  phone_number: str = None, customer_phone: str = None) -> None:
@@ -146,7 +148,25 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             print((f"Send Message - Failed to send message: {e}"))
             raise e
 
-    async def gpt_parse_order(self) -> object:
+    async def reset_silence_timer(self):
+        """Перезапускаємо таймер мовчання користувача"""
+        if self.silence_task and not self.silence_task.done():
+            self.silence_task.cancel()
+
+        self.silence_task = asyncio.create_task(self.silence_timeout_handler())
+
+    async def silence_timeout_handler(self):
+        """Викликається при 10 секундах мовчання"""
+        try:
+            await asyncio.sleep(self.SILENCE_TIMEOUT)
+            print(f"No user speech detected for {self.SILENCE_TIMEOUT} seconds. Hanging up.")
+            self.call_ended = True
+            await self.say_and_hang_up("Goodbye!")
+        except asyncio.CancelledError:
+            # Таймер скинуто, нічого не робимо
+            pass
+
+    async def gpt_parse_order(self) -> dict:
         try:
             api_version = "2025-01-01-preview"
 
@@ -271,25 +291,31 @@ Here are available services with prices {self.business_context.services}
                 match message.type:
                     case "input_audio_buffer.speech_started":
                         print("Detected speech started.")
+                        await self.reset_silence_timer()
                     case "input_audio_buffer.speech_stopped":
                         print("Detected speech started.")
+                        await self.reset_silence_timer()
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
                         self.order_text += user_message + " "
                         print(user_message)
                         await self.detect_farewell(transcript)
+                        await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.order_text += ai_message + " "
                         print(ai_message)
+                        await self.reset_silence_timer()
 
                     case "response.audio.delta":
                         await self.receive_audio(message.delta)
+                        await self.reset_silence_timer()
 
                     case "response.done":
                         print(f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
+                        await self.reset_silence_timer()
                         # If we've marked the call for end, now send ResponseCreateMessage and hang up
                         if self.call_ended:
                             # logger.info(self.order_text)
@@ -326,15 +352,16 @@ Here are available services with prices {self.business_context.services}
 
                                 #     self.order_submitted = True
 
-                                url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
-                                headers = {
-                                    "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
-                                    "Content-Type": "application/json"
-                                }
+                                if parsed_order['customerName'] and parsed_order['customerAddress'] and parsed_order['orderItems']:
+                                    url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
+                                    headers = {
+                                        "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
+                                        "Content-Type": "application/json"
+                                    }
 
-                                async with httpx.AsyncClient() as client:
-                                    response = await client.post(url, json=parsed_order, headers=headers)
-                                    print("Order endpoint status code:", response.status_code)
+                                    async with httpx.AsyncClient() as client:
+                                        response = await client.post(url, json=parsed_order, headers=headers)
+                                        print("Order endpoint status code:", response.status_code)
 
                             # self.order_submitted = True
                     case "error":
@@ -366,7 +393,7 @@ Here are available services with prices {self.business_context.services}
     async def detect_farewell(self, transcript: str) -> None:
         if any(phrase in transcript for phrase in FAREWELL_PHRASES):
             print("FAREWELL detected")
-            await self.say_and_hang_up("Thank you for calling. Goodbye!")
+            await self.say_and_hang_up("Goodbye!")
 
     async def say_and_hang_up(self, message: str) -> None:
         if self.call_ended:
@@ -379,3 +406,4 @@ Here are available services with prices {self.business_context.services}
             item=UserMessageItem(content=[content_part])
         )
         await self.rt_client.send(message=final_message)
+        await self.rt_client.send(ResponseCreateMessage())
