@@ -115,9 +115,9 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     # "language": "en"
                 },
                 "turn_detection": {
-                    "threshold": 0.6,
+                    "threshold": 0.3,
                     "silence_duration_ms": 300,
-                    "prefix_padding_ms": 200,
+                    "prefix_padding_ms": 500,
                     "type": "server_vad",
                 },
             },
@@ -399,6 +399,7 @@ Here are available services with prices {self.business_context.services}
         if self.call_ended:
             return
         self.call_ended = True
+        self.silence_task.cancel()
 
         # Send final goodbye message
         content_part = InputTextContentPart(text=message)
