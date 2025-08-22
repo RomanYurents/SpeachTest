@@ -352,7 +352,7 @@ Here are available services with prices {self.business_context.services}
 
                                 #     self.order_submitted = True
 
-                                if parsed_order['customerName'] and parsed_order['customerAddress'] and parsed_order['orderItems']:
+                                if parsed_order['customerName'] and parsed_order['orderItems']:
                                     url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
                                     headers = {
                                         "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
