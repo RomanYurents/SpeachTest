@@ -20,6 +20,7 @@ uvicorn>=0.34.0
 watchfiles>=1.0.4
 websockets>=14.2
 rtclient @ https://github.com/Azure-Samples/aoai-realtime-audio-sdk/releases/download/py%2Fv0.5.3/rtclient-0.5.3.tar.gz
+#-e ./rtclient
 asyncpg==0.30.0
 pytz==2025.2
 SQLAlchemy==2.0.43

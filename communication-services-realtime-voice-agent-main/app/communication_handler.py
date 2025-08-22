@@ -257,7 +257,12 @@ Here are available services with prices {self.business_context.services}
     async def receive_messages_async(self) -> None:
         try:
             while not self.rt_client.closed:
-                message: ServerMessageType = await self.rt_client.recv()
+                try:
+                    message: ServerMessageType = await self.rt_client.recv()
+                except ValueError as e:
+                    print(f"Failed to get message: {e}")
+                    continue
+
                 if message is None or self.rt_client.ws.closed:
                     continue
 
@@ -303,7 +308,7 @@ Here are available services with prices {self.business_context.services}
                                 print(f"Failed to hang up call {self.call_connection_id}: {e}")
 
                             # Give the user some time to hear it
-                            if self.business_context:
+                            if self.business_context and self.business_context.is_open:
                                 parsed_order = await self.gpt_parse_order()
 
                                 # parsed_order_str = json.dumps(parsed_order, indent=2)
