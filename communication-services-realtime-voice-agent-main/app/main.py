@@ -1,8 +1,9 @@
+import logging
 import os
 import uuid
-from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import JSONResponse
-from azure.eventgrid import EventGridEvent, SystemEventNames
+from logging import getLogger
+from urllib.parse import urlencode, urlparse, urlunparse
+
 from azure.communication.callautomation import (
     MediaStreamingOptions,
     AudioFormat,
@@ -11,15 +12,41 @@ from azure.communication.callautomation import (
     MediaStreamingAudioChannelType,
     CallAutomationClient,
 )
-from app.communication_handler import CommunicationHandler
-from loguru import logger
-from urllib.parse import urlencode, urlparse, urlunparse
-import os
+from azure.eventgrid import EventGridEvent, SystemEventNames
+from azure.monitor.opentelemetry import configure_azure_monitor
 from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import JSONResponse
+from opentelemetry import trace
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.trace import (
+    get_tracer_provider,
+)
+
+from app.communication_handler import CommunicationHandler
+
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+logging.getLogger("azure.monitor.opentelemetry.exporter").setLevel(logging.WARNING)
+
+
+if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    configure_azure_monitor()
+
+tracer = trace.get_tracer(__name__,
+                          tracer_provider=get_tracer_provider())
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-load_dotenv()
+FastAPIInstrumentor.instrument_app(app)
 
 # ACS setup
 acs_ca_client = CallAutomationClient.from_connection_string(os.getenv("ACS_CONNECTION_STRING"))
@@ -45,13 +72,13 @@ async def incoming_call_handler(request: Request):
 
         elif event.event_type == "Microsoft.Communication.IncomingCall":
             caller_id = event.data["from"]["phoneNumber"]["value"] if event.data["from"]["kind"] == "phoneNumber" else \
-            event.data["from"]["rawId"]
+                event.data["from"]["rawId"]
             callee_id = event.data["to"]["phoneNumber"]["value"] if event.data["from"]["kind"] == "phoneNumber" else \
                 event.data["from"]["rawId"]
             incoming_call_context = event.data["incomingCallContext"]
             guid = str(uuid.uuid4())
 
-            print(f"Call info: {caller_id} ➝ {callee_id}")
+            logger.info(f"Call info: {caller_id} ➝ {callee_id}")
 
             query_params = urlencode({"callerId": caller_id, "contextId": guid})
             callback_uri = f"{os.getenv("CALLBACK_URI_HOST")}/api/callbacks/{guid}?{query_params}"

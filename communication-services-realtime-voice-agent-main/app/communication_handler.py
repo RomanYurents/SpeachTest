@@ -28,6 +28,10 @@ from app.business_context import BusinessContextManager
 
 load_dotenv()
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # logger = Logger.with_default_handlers()
 
 # Farewell detection list
@@ -83,12 +87,12 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 self.business_context, self.system_prompt = await service.get_context_and_prompt(
                     self.phone_number
                 )
-                print(f"Initialized context for phone: {self.phone_number}")
+                logger.info(f"Initialized context for phone: {self.phone_number}")
                 if self.business_context:
-                    print(f"Business: {self.business_context.name}")
-                    print(f"Is open: {self.business_context.is_open}")
+                    logger.info(f"Business: {self.business_context.name}")
+                    logger.info(f"Is open: {self.business_context.is_open}")
         else:
-            print("No phone number provided, using default prompt")
+            logger.warning("No phone number provided, using default prompt")
 
     async def start_conversation_async(self) -> None:
         await self.initialize_business_context()
@@ -101,7 +105,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         try:
             await self.rt_client.connect()
         except Exception as e:
-            print(f"Failed to connect to Azure OpenAI Realtime Service: {e}")
+            logger.error(f"Failed to connect to Azure OpenAI Realtime Service: {e}")
             raise e
 
         session_update_message = {
@@ -145,7 +149,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 await self.active_websocket.send_text(message)
         except Exception as e:
             # logger.error(f"Send Message - Failed to send message: {e}")
-            print((f"Send Message - Failed to send message: {e}"))
+            logger.error((f"Send Message - Failed to send message: {e}"))
             raise e
 
     async def reset_silence_timer(self):
@@ -159,7 +163,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         """Викликається при 10 секундах мовчання"""
         try:
             await asyncio.sleep(self.SILENCE_TIMEOUT)
-            print(f"No user speech detected for {self.SILENCE_TIMEOUT} seconds. Hanging up.")
+            logger.info(f"No user speech detected for {self.SILENCE_TIMEOUT} seconds. Hanging up.")
             self.call_ended = True
             await self.say_and_hang_up("Goodbye!")
         except asyncio.CancelledError:
@@ -219,6 +223,8 @@ Here are available services with prices {self.business_context.services}
                 }
             ]
 
+            logger.info(f"[Conversation transcript] - {self.order_text}")
+
             messages = chat_prompt
 
             class OrderItem(BaseModel):
@@ -271,7 +277,7 @@ Here are available services with prices {self.business_context.services}
 
         except Exception as e:
             # logger.error(f"GPT Parse Order - Failed to parse order: {e}")
-            print(f"GPT Parse Order - Failed to parse order: {e}")
+            logger.error(f"GPT Parse Order - Failed to parse order: {e}")
             raise e
 
     async def receive_messages_async(self) -> None:
@@ -280,7 +286,7 @@ Here are available services with prices {self.business_context.services}
                 try:
                     message: ServerMessageType = await self.rt_client.recv()
                 except ValueError as e:
-                    print(f"Failed to get message: {e}")
+                    logger.error(f"Failed to get message: {e}")
                     continue
 
                 if message is None or self.rt_client.ws.closed:
@@ -290,23 +296,23 @@ Here are available services with prices {self.business_context.services}
 
                 match message.type:
                     case "input_audio_buffer.speech_started":
-                        print("Detected speech started.")
+                        logger.info("Detected speech started.")
                         await self.reset_silence_timer()
                     case "input_audio_buffer.speech_stopped":
-                        print("Detected speech started.")
+                        logger.info("Detected speech started.")
                         await self.reset_silence_timer()
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
                         self.order_text += user_message + " "
-                        print(user_message)
+                        logger.info(user_message)
                         await self.detect_farewell(transcript)
                         await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.order_text += ai_message + " "
-                        print(ai_message)
+                        logger.info(ai_message)
                         await self.reset_silence_timer()
 
                     case "response.audio.delta":
@@ -314,7 +320,7 @@ Here are available services with prices {self.business_context.services}
                         await self.reset_silence_timer()
 
                     case "response.done":
-                        print(f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
+                        logger.info(f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
                         await self.reset_silence_timer()
                         # If we've marked the call for end, now send ResponseCreateMessage and hang up
                         if self.call_ended:
@@ -328,10 +334,10 @@ Here are available services with prices {self.business_context.services}
                                 self.call_ended = False
                                 call_connection.hang_up(is_for_everyone=True)
                                 # logger.info(f"Call {self.call_connection_id} ended.")
-                                print(f"Call {self.call_connection_id} ended.")
+                                logger.info(f"Call {self.call_connection_id} ended.")
                             except Exception as e:
                                 # logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
-                                print(f"Failed to hang up call {self.call_connection_id}: {e}")
+                                logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
 
                             # Give the user some time to hear it
                             if self.business_context and self.business_context.is_open:
@@ -361,14 +367,14 @@ Here are available services with prices {self.business_context.services}
 
                                     async with httpx.AsyncClient() as client:
                                         response = await client.post(url, json=parsed_order, headers=headers)
-                                        print("Order endpoint status code:", response.status_code)
+                                        logger.info("Order endpoint status code:", response.status_code)
 
                             # self.order_submitted = True
                     case "error":
-                        print(f"Error: {message.error}")
+                        logger.error(f"Error: {message.error}")
         except Exception as e:
             # logger.error(f"Error in receive_messages_async: {e}")
-            print(f"Error in receive_messages_async: {e}")
+            logger.error(f"Error in receive_messages_async: {e}")
             if not isinstance(e, asyncio.CancelledError):
                 raise e
 
@@ -381,7 +387,7 @@ Here are available services with prices {self.business_context.services}
             }
             await self.send_message_async(json.dumps(audio_data))
         except Exception as e:
-            print(f"Error sending audio: {e}")
+            logger.error(f"Error sending audio: {e}")
 
     async def send_audio_async(self, audio_data: str) -> None:
         await self.rt_client.send(
@@ -392,7 +398,7 @@ Here are available services with prices {self.business_context.services}
 
     async def detect_farewell(self, transcript: str) -> None:
         if any(phrase in transcript for phrase in FAREWELL_PHRASES):
-            print("FAREWELL detected")
+            logger.info("FAREWELL detected")
             await self.say_and_hang_up("Goodbye!")
 
     async def say_and_hang_up(self, message: str) -> None:

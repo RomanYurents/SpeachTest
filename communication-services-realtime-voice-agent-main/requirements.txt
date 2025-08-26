@@ -24,3 +24,6 @@ rtclient @ https://github.com/Azure-Samples/aoai-realtime-audio-sdk/releases/dow
 asyncpg==0.30.0
 pytz==2025.2
 SQLAlchemy==2.0.43
+opentelemetry-api >= 1.10.0
+opentelemetry-sdk >= 1.10.0
+azure-monitor-opentelemetry >= 1.1.1
