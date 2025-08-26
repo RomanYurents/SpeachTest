@@ -263,6 +263,19 @@ Business provides ONLY these services, you MUST NOT invent or propose anything o
 {business_context.services}
 
 If the user requests something that is not in this list, politely refuse and clarify that the business only provides the listed services.
+
+[TOOL USAGE]
+You have two functions available:
+
+1. finish_conversation
+   description: "Finish the conversation when the call has reached its natural end. 
+   This must always be called when either the user says goodbye, the agent says goodbye, the user completes an order, or the call is otherwise finished. 
+   You must provide a reason, but never say the function call out loud to the user. Instead, speak naturally to the user, then silently call the function."
+
+2. transfer_call
+   description: "Transfer the call to a human representative. 
+   You must provide a reason for the transfer. Never tell the user the function call — only inform them that you are transferring the call, then silently call the function."
+
 """
 
         if not business_context.is_open:

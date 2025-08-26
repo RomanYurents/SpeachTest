@@ -5,7 +5,7 @@ import uuid
 from typing import List
 
 import httpx
-from azure.communication.callautomation import CallAutomationClient
+from azure.communication.callautomation import CallAutomationClient, PhoneNumberIdentifier
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 from fastapi import WebSocket
@@ -65,6 +65,22 @@ class CommunicationHandler:
     system_prompt = """
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take calls. Please assist the caller as best you can.
+[TOOL USAGE]
+1. `finish_conversation`  
+   - **Description**: End the current conversation. Use this when the interaction has reached its natural conclusion.  
+   - **When to use**:  
+     • The user says goodbye or thanks and clearly ends the conversation.  
+     • The order, booking, or request has been fully processed and confirmed.  
+     • The call logically comes to an end and there is no further need to continue.  
+   - **Example**: `finish_conversation(reason="User said goodbye and ended the call.")`  
+
+2. `transfer_call`  
+   - **Description**: Transfer the call to a human agent. Use this when the user requests direct communication with a person.  
+   - **When to use**:  
+     • The user asks to speak with a human, manager, or representative.  
+     • The user explicitly asks for escalation or refuses to continue with the AI.  
+   - **Important**: You must always provide a reason for the transfer.  
+   - **Example**: `transfer_call(reason="User requested to speak with a human.")`  
     """
     SILENCE_TIMEOUT = 10
     silence_task: asyncio.Task | None = None
@@ -79,6 +95,109 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         self.phone_number = phone_number
         self.customer_phone = customer_phone
         self.business_context = None
+        self.tools = [
+            {
+                "type": "function",
+                "name": "transfer_call",
+                "description": (
+                    "Redirect the call to a human agent or another department. "
+                    "Use this function when the user explicitly requests to speak with a manager or a human, "
+                    "or when the AI cannot provide sufficient information or does not know the answer."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "reason": {
+                            "type": "string",
+                            "description": "Reason for transferring the call",
+                        },
+                    },
+                    "required": ["reason"],
+                },
+            },
+            {
+                "type": "function",
+                "name": "finish_conversation",
+                "description": "Finish the conversation. Used when the conversation is finished — for example, when the user says goodbye, completes an order, or the call reaches its natural end. This function is used to hang up the call.",
+                "parameters": {},
+            }
+        ]
+
+    async def handle_tools(self, previous_item_id: str, call_id: str, tool_name: str, arguments: dict):
+        if tool_name == "transfer_call":
+            reason = arguments.get("reason", "User requested transfer")
+            agent_number = os.getenv("AGENT_PHONE_NUMBER", "+1234567890")
+            logger.info(f"Tool request: transfer_call, reason: {reason}")
+            await self.transfer_call_to_agent(agent_number, reason)
+        elif tool_name == "finish_conversation":
+            logger.info("Tool request: finish_conversation")
+            try:
+                call_connection = self.acs_client.get_call_connection(self.call_connection_id)
+                self.call_ended = False
+                call_connection.hang_up(is_for_everyone=True)
+                logger.info(f"Call {self.call_connection_id} ended.")
+            except Exception as e:
+                logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
+
+            if self.business_context and self.business_context.is_open:
+                parsed_order = await self.gpt_parse_order()
+
+                if parsed_order['customerName'] and parsed_order['orderItems']:
+                    url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
+                    headers = {
+                        "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
+                        "Content-Type": "application/json"
+                    }
+
+                    async with httpx.AsyncClient() as client:
+                        response = await client.post(url, json=parsed_order, headers=headers)
+                        logger.info("Order endpoint status code:", response.status_code)
+        else:
+            logger.warning(f"Unknown tool request: {tool_name}")
+
+    async def transfer_call_to_agent(self, agent_phone_number: str, reason: str = None) -> bool:
+        try:
+            if self.call_ended:
+                logger.warning("Cannot transfer ended call")
+                return False
+
+            logger.info(f"Transferring call {self.call_connection_id} to agent {agent_phone_number}")
+
+            target_participant = PhoneNumberIdentifier(agent_phone_number)
+
+            call_connection = self.acs_client.get_call_connection(self.call_connection_id)
+
+            transfer_result = call_connection.transfer_call_to_participant(
+                target_participant=target_participant
+            )
+
+            logger.info(f"Call transfer initiated successfully: {transfer_result}")
+
+            self.call_ended = True
+            if self.silence_task and not self.silence_task.done():
+                self.silence_task.cancel()
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to transfer call: {e}")
+            return False
+
+    async def detect_transfer_request(self, transcript: str) -> bool:
+        transfer_phrases = [
+            "speak to agent",
+            "talk to human",
+            "transfer to agent",
+            "connect me to agent",
+            "I want to speak to someone",
+            "human operator",
+            "real person",
+            "customer service",
+            "representativ"
+        ]
+
+        transcript_lower = transcript.lower()
+        return any(phrase in transcript_lower for phrase in transfer_phrases)
 
     async def initialize_business_context(self) -> None:
         """Initialize business context by phone number"""
@@ -124,6 +243,8 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     "prefix_padding_ms": 500,
                     "type": "server_vad",
                 },
+                "tools": self.tools,
+                "tool_choice": "auto"
             },
         }
 
@@ -153,14 +274,12 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             raise e
 
     async def reset_silence_timer(self):
-        """Перезапускаємо таймер мовчання користувача"""
         if self.silence_task and not self.silence_task.done():
             self.silence_task.cancel()
 
         self.silence_task = asyncio.create_task(self.silence_timeout_handler())
 
     async def silence_timeout_handler(self):
-        """Викликається при 10 секундах мовчання"""
         try:
             await asyncio.sleep(self.SILENCE_TIMEOUT)
             logger.info(f"No user speech detected for {self.SILENCE_TIMEOUT} seconds. Hanging up.")
@@ -306,7 +425,6 @@ Here are available services with prices {self.business_context.services}
                         user_message = f"User: {transcript}"
                         self.order_text += user_message + " "
                         logger.info(user_message)
-                        await self.detect_farewell(transcript)
                         await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
@@ -319,59 +437,21 @@ Here are available services with prices {self.business_context.services}
                         await self.receive_audio(message.delta)
                         await self.reset_silence_timer()
 
+                    case "response.function_call_arguments.done":
+                        logger.info(f"Received tool call: {message.name}")
+                        arguments = json.loads(message.arguments)
+                        await self.handle_tools(message.item_id, message.call_id, message.name, arguments)
+
                     case "response.done":
-                        logger.info(f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
+                        logger.info(
+                            f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
                         await self.reset_silence_timer()
                         # If we've marked the call for end, now send ResponseCreateMessage and hang up
-                        if self.call_ended:
-                            # logger.info(self.order_text)
-                            # print(self.order_text)
-                            await asyncio.sleep(2)  # Give it a moment to flush the audio
-                            # await self.rt_client.send(ResponseCreateMessage())
 
-                            try:
-                                call_connection = self.acs_client.get_call_connection(self.call_connection_id)
-                                self.call_ended = False
-                                call_connection.hang_up(is_for_everyone=True)
-                                # logger.info(f"Call {self.call_connection_id} ended.")
-                                logger.info(f"Call {self.call_connection_id} ended.")
-                            except Exception as e:
-                                # logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
-                                logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
-
-                            # Give the user some time to hear it
-                            if self.business_context and self.business_context.is_open:
-                                parsed_order = await self.gpt_parse_order()
-
-                                # parsed_order_str = json.dumps(parsed_order, indent=2)
-
-                                # if self.order_submitted != True:
-                                #     url = "https://app-aitell-test-hdc4e0bmb4a7fcd3.swedencentral-01.azurewebsites.net/orders"
-                                #     headers = {
-                                #         "x-api-key": "ac7d13c4-db2c-4bf0-87bb-205e03b34ea6",
-                                #         "Content-Type": "application/json"
-                                #     }
-
-                                #     response = requests.post(url, json=parsed_order, headers=headers)
-
-                                #     print("Order endpoint status code:", response.status_code)
-
-                                #     self.order_submitted = True
-
-                                if parsed_order['customerName'] and parsed_order['orderItems']:
-                                    url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
-                                    headers = {
-                                        "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
-                                        "Content-Type": "application/json"
-                                    }
-
-                                    async with httpx.AsyncClient() as client:
-                                        response = await client.post(url, json=parsed_order, headers=headers)
-                                        logger.info("Order endpoint status code:", response.status_code)
-
-                            # self.order_submitted = True
                     case "error":
                         logger.error(f"Error: {message.error}")
+                    case _:
+                        print(message.type)
         except Exception as e:
             # logger.error(f"Error in receive_messages_async: {e}")
             logger.error(f"Error in receive_messages_async: {e}")
