@@ -1,5 +1,6 @@
-import asyncio
 import json
+import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, time
@@ -7,7 +8,7 @@ from typing import Optional, Dict, Any
 
 import pytz
 from dotenv import load_dotenv
-from sqlalchemy import Column, String, Text, DateTime, func, JSON, ForeignKey, Numeric, UUID
+from sqlalchemy import Column, String, Text, JSON, ForeignKey, Numeric, UUID
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.future import select
@@ -17,6 +18,7 @@ load_dotenv()
 
 Base = declarative_base()
 
+logger = logging.getLogger(__name__)
 
 class Business(Base):
     __tablename__ = 'businesses'
@@ -190,10 +192,10 @@ class DatabaseManager:
                 return None
 
         except SQLAlchemyError as e:
-            print(f"Database error: {e}")
+            logger.error(f"Database error: {e}")
             return None
         except Exception as e:
-            print(f"Unexpected error fetching business data: {e}")
+            logger.error(f"Unexpected error fetching business data: {e}")
             return None
 
     async def close(self):
@@ -218,7 +220,7 @@ class DatabaseManager:
             except (json.JSONDecodeError, TypeError):
                 if isinstance(operating_hours, str) and operating_hours.lower() in ["24/7", "24 hours", "always open"]:
                     return True
-                print(f"Could not parse operating hours format: {operating_hours}")
+                logger.error(f"Could not parse operating hours format: {operating_hours}")
                 return True
 
             if current_day in hours_data:
@@ -240,13 +242,13 @@ class DatabaseManager:
                         return current_time >= open_time or current_time <= close_time
 
                 except (ValueError, KeyError) as e:
-                    print(f"Error parsing time for {current_day}: {e}")
+                    logger.error(f"Error parsing time for {current_day}: {e}")
                     return True
 
             return False
 
         except Exception as e:
-            print(f"Error checking operating hours: {e}")
+            logger.error(f"Error checking operating hours: {e}")
             return True
 
 
@@ -375,22 +377,3 @@ class BusinessContextManager:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.service:
             await self.service.close()
-
-# async def test():
-#     async with BusinessContextManager() as service:
-#         phone_number = "+4570722984"
-#
-#         business_context, system_prompt = await service.get_context_and_prompt(phone_number)
-#
-#         if business_context:
-#             print(str(business_context.id))
-#             print(f"Founded business: {business_context.name}")
-#             print(f"Opened now: {business_context.is_open}")
-#             print("\nGenerated prompt:")
-#             print(system_prompt)
-#         else:
-#             print("Not found")
-#
-#
-# if __name__ == "__main__":
-#     asyncio.run(test())

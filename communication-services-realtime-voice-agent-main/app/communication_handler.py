@@ -13,7 +13,6 @@ from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 from openai import AsyncAzureOpenAI
 from pydantic import BaseModel, Field
-# from aiologger import Logger
 from rtclient import (
     InputTextContentPart,
     ItemCreateMessage,
@@ -22,7 +21,7 @@ from rtclient import (
     SessionUpdateMessage,
     ServerMessageType,
     UserMessageItem,
-    InputAudioBufferAppendMessage, FunctionCallOutputItem, ResponseCreateParams,
+    InputAudioBufferAppendMessage, FunctionCallOutputItem, ItemTruncateMessage,
 )
 
 from app.business_context import BusinessContextManager
@@ -32,8 +31,6 @@ load_dotenv()
 import logging
 
 logger = logging.getLogger(__name__)
-
-# logger = Logger.with_default_handlers()
 
 
 class Role(str, Enum):
@@ -224,7 +221,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 "input_audio_format": "pcm16",
                 "input_audio_transcription": {
                     "model": "whisper-1",
-                    # "language": "en"
                 },
                 "turn_detection": {
                     "threshold": 0.3,
@@ -240,12 +236,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         session_update_payload = SessionUpdateMessage(**session_update_message)
         await self.rt_client.send(session_update_payload)
 
-        # Initial greeting
         self.conversation_call_id = str(uuid.uuid4())
-        # if self.business_context.is_open:
-        #     await self.say_message(f"System message: greate user with this message {self.business_context.greeting_message}")
-        # else:
-        #     await self.say_message(f"System message: business is close, say this message {self.business_context.close_message}")
 
         await self.rt_client.send(ResponseCreateMessage())
 
@@ -266,7 +257,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             if self.active_websocket.client_state == WebSocketState.CONNECTED:
                 await self.active_websocket.send_text(message)
         except Exception as e:
-            # logger.error(f"Send Message - Failed to send message: {e}")
             logger.error((f"Send Message - Failed to send message: {e}"))
             raise e
 
@@ -283,7 +273,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             self.call_ended = True
             await self.say_and_hang_up("Goodbye!")
         except asyncio.CancelledError:
-            # Таймер скинуто, нічого не робимо
             pass
 
     async def gpt_parse_order(self) -> dict:
@@ -367,22 +356,17 @@ Here are available services with prices {self.business_context.services}
                 source: str = Field(..., description="Order source, e.g., web")
                 status: str = Field(..., description="Order status, e.g., confirmed")
 
-            # Generate the completion
             completion = await client.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=16384,
                 temperature=0,
                 top_p=0.95,
-                frequency_penalty=0,  # punishment for repetition
-                presence_penalty=0,  # punishment for theme
+                frequency_penalty=0,
+                presence_penalty=0,
                 stop=None,
                 response_format=OrderData
             )
-
-            # for update in completion:
-            #     if update.choices:
-            #         print(update.choices[0].delta.content or "", end="")
 
             await client.close()
 
@@ -393,7 +377,6 @@ Here are available services with prices {self.business_context.services}
             return result
 
         except Exception as e:
-            # logger.error(f"GPT Parse Order - Failed to parse order: {e}")
             logger.error(f"GPT Parse Order - Failed to parse order: {e}")
             raise e
 
@@ -408,8 +391,6 @@ Here are available services with prices {self.business_context.services}
 
                 if message is None or self.rt_client.ws.closed:
                     continue
-
-                # print(f"Received message of type: {message.type}")
 
                 match message.type:
                     case "input_audio_buffer.speech_started":
@@ -446,14 +427,12 @@ Here are available services with prices {self.business_context.services}
                         logger.info(
                             f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
                         await self.reset_silence_timer()
-                        # If we've marked the call for end, now send ResponseCreateMessage and hang up
 
                     case "error":
                         logger.error(f"Error: {message.error}")
                     case _:
                         print(message.type)
         except Exception as e:
-            # logger.error(f"Error in receive_messages_async: {e}")
             logger.error(f"Error in receive_messages_async: {e}")
             if not isinstance(e, asyncio.CancelledError):
                 raise e
@@ -483,7 +462,6 @@ Here are available services with prices {self.business_context.services}
         self.call_ended = True
         self.silence_task.cancel()
 
-        # Send final goodbye message
         content_part = InputTextContentPart(text=message)
         final_message = ItemCreateMessage(
             item=UserMessageItem(content=[content_part])
