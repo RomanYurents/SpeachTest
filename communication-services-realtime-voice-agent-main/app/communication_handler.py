@@ -35,27 +35,6 @@ logger = logging.getLogger(__name__)
 
 # logger = Logger.with_default_handlers()
 
-# Farewell detection list
-FAREWELL_PHRASES = [
-    "thanks, that's all",
-    "thank you, bye",
-    "bye",
-    "goodbye",
-    "see you",
-    "talk to you later",
-    "tack, det var allt",
-    "tack, hej då",
-    "tack",
-    "tack, adjö",
-    "tack, hej då",
-    "hej då",
-    "adjö",
-    "hej då",
-    "det var allt",
-    "vi ses",
-    "vi hörs senare",
-    "vi pratar senare"
-]
 
 class Role(str, Enum):
     AI = "ai"
@@ -209,22 +188,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             logger.error(f"Failed to transfer call: {e}")
             return False
 
-    async def detect_transfer_request(self, transcript: str) -> bool:
-        transfer_phrases = [
-            "speak to agent",
-            "talk to human",
-            "transfer to agent",
-            "connect me to agent",
-            "I want to speak to someone",
-            "human operator",
-            "real person",
-            "customer service",
-            "representativ"
-        ]
-
-        transcript_lower = transcript.lower()
-        return any(phrase in transcript_lower for phrase in transfer_phrases)
-
     async def initialize_business_context(self) -> None:
         """Initialize business context by phone number"""
         if self.phone_number:
@@ -279,10 +242,10 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
 
         # Initial greeting
         self.conversation_call_id = str(uuid.uuid4())
-        if self.business_context.is_open:
-            await self.say_message(f"System message: greate user with this message {self.business_context.greeting_message}")
-        else:
-            await self.say_message(f"System message: business is close, say this message {self.business_context.close_message}")
+        # if self.business_context.is_open:
+        #     await self.say_message(f"System message: greate user with this message {self.business_context.greeting_message}")
+        # else:
+        #     await self.say_message(f"System message: business is close, say this message {self.business_context.close_message}")
 
         await self.rt_client.send(ResponseCreateMessage())
 
@@ -513,10 +476,6 @@ Here are available services with prices {self.business_context.services}
             )
         )
 
-    async def detect_farewell(self, transcript: str) -> None:
-        if any(phrase in transcript for phrase in FAREWELL_PHRASES):
-            logger.info("FAREWELL detected")
-            await self.say_and_hang_up("Goodbye!")
 
     async def say_and_hang_up(self, message: str) -> None:
         if self.call_ended:

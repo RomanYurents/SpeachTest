@@ -262,7 +262,7 @@ You are a helpful and efficient order-taker with a natural-sounding voice.
 - If the user speaks Swedish, respond in Swedish instead.  
 - Only English and Swedish are allowed in your responses.  
 
-Always great user with this message: {business_context.greeting_message}
+{business_context.greeting_message}
 
 [BUSINESS INFORMATION]
 Business Name: {business_context.name}
@@ -294,7 +294,7 @@ You have two functions available:
             base_prompt += f"""
 [IMPORTANT NOTICE]
 The business is currently CLOSED. Please inform the customer that we are not operating right now and ask them to call during our operating hours.
-Inform user with this message: {business_context.close_message}
+{business_context.close_message}
 """
 
         if business_context.is_open:
