@@ -29,8 +29,9 @@ class Business(Base):
     country = Column(String(100))
     phone = Column(String(20), unique=True, nullable=False)
     operating_hours = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    greeting_message = Column(Text)
+    close_message = Column(Text)
+    human_phone = Column(String(20))
 
     categories = relationship(
         "CatalogCategory",
@@ -82,6 +83,9 @@ class BusinessContext:
     phone: str
     is_open: bool = True
     services: str = None
+    human_phone: str = None
+    greeting_message: str = None
+    close_message: str = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -93,7 +97,11 @@ class BusinessContext:
             'country': self.country,
             'operating_hours': self.operating_hours,
             'phone': self.phone,
-            'is_open': self.is_open
+            'is_open': self.is_open,
+            'human_phone': self.human_phone,
+            'services': self.services,
+            'greeting_message': self.greeting_message,
+            'close_message': self.close_message,
         }
 
 
@@ -169,7 +177,10 @@ class DatabaseManager:
                         country=business.country or "",
                         operating_hours=operating_hours_str,
                         phone=business.phone,
-                        services=services_str
+                        services=services_str,
+                        greeting_message=business.greeting_message,
+                        close_message=business.close_message,
+                        human_phone=business.human_phone,
                     )
 
                     business_context.is_open = self._check_if_open(business_context.operating_hours)
@@ -251,6 +262,7 @@ You are a helpful and efficient order-taker with a natural-sounding voice.
 - If the user speaks Swedish, respond in Swedish instead.  
 - Only English and Swedish are allowed in your responses.  
 
+Always great user with this message: {business_context.greeting_message}
 
 [BUSINESS INFORMATION]
 Business Name: {business_context.name}
@@ -282,7 +294,7 @@ You have two functions available:
             base_prompt += f"""
 [IMPORTANT NOTICE]
 The business is currently CLOSED. Please inform the customer that we are not operating right now and ask them to call during our operating hours.
-You should politely explain this and not proceed with taking an order.
+Inform user with this message: {business_context.close_message}
 """
 
         if business_context.is_open:

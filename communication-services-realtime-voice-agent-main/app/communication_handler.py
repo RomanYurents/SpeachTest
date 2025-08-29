@@ -22,7 +22,7 @@ from rtclient import (
     SessionUpdateMessage,
     ServerMessageType,
     UserMessageItem,
-    InputAudioBufferAppendMessage,
+    InputAudioBufferAppendMessage, FunctionCallOutputItem, ResponseCreateParams,
 )
 
 from app.business_context import BusinessContextManager
@@ -135,9 +135,19 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
     async def handle_tools(self, previous_item_id: str, call_id: str, tool_name: str, arguments: dict):
         if tool_name == "transfer_call":
             reason = arguments.get("reason", "User requested transfer")
-            agent_number = os.getenv("AGENT_PHONE_NUMBER", "+1234567890")
             logger.info(f"Tool request: transfer_call, reason: {reason}")
-            await self.transfer_call_to_agent(agent_number, reason)
+            result = await self.transfer_call_to_agent(self.business_context.human_phone)
+
+            if not result:
+                await self.rt_client.send(
+                    ItemCreateMessage(
+                        item=FunctionCallOutputItem(
+                            call_id=call_id,
+                            output="An error occurred while transferring the call to the human agent.",
+                        ),
+                        previous_item_id=previous_item_id,
+                    )
+                )
         elif tool_name == "finish_conversation":
             logger.info("Tool request: finish_conversation")
             try:
@@ -171,7 +181,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         else:
             logger.warning(f"Unknown tool request: {tool_name}")
 
-    async def transfer_call_to_agent(self, agent_phone_number: str, reason: str = None) -> bool:
+    async def transfer_call_to_agent(self, agent_phone_number: str) -> bool:
         try:
             if self.call_ended:
                 logger.warning("Cannot transfer ended call")
@@ -269,16 +279,24 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
 
         # Initial greeting
         self.conversation_call_id = str(uuid.uuid4())
+        if self.business_context.is_open:
+            await self.say_message(f"System message: greate user with this message {self.business_context.greeting_message}")
+        else:
+            await self.say_message(f"System message: business is close, say this message {self.business_context.close_message}")
+
+        await self.rt_client.send(ResponseCreateMessage())
+
+        asyncio.create_task(self.receive_messages_async())
+
+    async def say_message(self, message: str):
         content_part = InputTextContentPart(
-            text="Hello! I am your AI assistant. How can I help you today?"
+            text=message
         )
         initial_message = ItemCreateMessage(
             item=UserMessageItem(content=[content_part])
         )
         await self.rt_client.send(message=initial_message)
-        await self.rt_client.send(ResponseCreateMessage())
 
-        asyncio.create_task(self.receive_messages_async())
 
     async def send_message_async(self, message: str) -> None:
         try:
