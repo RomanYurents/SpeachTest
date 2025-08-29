@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import uuid
+from enum import Enum
 from typing import List
 
 import httpx
@@ -56,6 +57,13 @@ FAREWELL_PHRASES = [
     "vi pratar senare"
 ]
 
+class Role(str, Enum):
+    AI = "ai"
+    USER = "user"
+
+class Message(BaseModel):
+    role: Role
+    message: str
 
 class CommunicationHandler:
     order_text = ""
@@ -84,6 +92,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
     """
     SILENCE_TIMEOUT = 10
     silence_task: asyncio.Task | None = None
+    conversation: List[Message] = []
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient,
                  phone_number: str = None, customer_phone: str = None) -> None:
@@ -149,8 +158,15 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                         "Content-Type": "application/json"
                     }
 
+                    payload = {
+                        "messages": [m.model_dump() for m in self.conversation],
+                        "order": parsed_order
+                    }
+
+                    logger.info(payload)
+
                     async with httpx.AsyncClient() as client:
-                        response = await client.post(url, json=parsed_order, headers=headers)
+                        response = await client.post(url, json=payload, headers=headers)
                         logger.info("Order endpoint status code:", response.status_code)
         else:
             logger.warning(f"Unknown tool request: {tool_name}")
@@ -343,6 +359,7 @@ Here are available services with prices {self.business_context.services}
             ]
 
             logger.info(f"[Conversation transcript] - {self.order_text}")
+            logger.info(f"[Conversation transcript] - {self.conversation}")
 
             messages = chat_prompt
 
@@ -424,12 +441,14 @@ Here are available services with prices {self.business_context.services}
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
                         self.order_text += user_message + " "
+                        self.conversation.append(Message(role=Role.USER, message=user_message))
                         logger.info(user_message)
                         await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.order_text += ai_message + " "
+                        self.conversation.append(Message(role=Role.USER, message=ai_message))
                         logger.info(ai_message)
                         await self.reset_silence_timer()
 
