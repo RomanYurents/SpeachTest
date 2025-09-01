@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import uuid
+from datetime import datetime
 from enum import Enum
 from typing import List
 
@@ -145,8 +146,25 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     }
 
                     payload = {
-                        "messages": [m.model_dump() for m in self.conversation],
-                        "order": parsed_order
+                        "businessId": parsed_order.get("businessId", ""),
+                        "customerName": parsed_order.get("customerName", ""),
+                        "customerPhone": parsed_order.get("customerPhone", ""),
+                        "customerEmail": parsed_order.get("customerEmail", ""),
+                        "customerAddress": parsed_order.get("customerAddress", ""),
+                        "orderItems": parsed_order.get("orderItems", []),
+                        "totalAmount": parsed_order.get("totalAmount", 0),
+                        "currency": parsed_order.get("currency", "USD"),
+                        "conversationHistory": [
+                            {"role": m.role, "message": m.message} for m in self.conversation
+                        ],
+                        "specialInstructions": parsed_order.get("specialInstructions", ""),
+                        "estimatedCompletionTime": parsed_order.get(
+                            "estimatedCompletionTime",
+                            datetime.utcnow().isoformat() + "Z"
+                        ),
+                        "paymentMethod": parsed_order.get("paymentMethod", ""),
+                        "source": parsed_order.get("source", "phone"),
+                        "status": parsed_order.get("status", "unhandled")
                     }
 
                     logger.info(payload)
@@ -410,7 +428,7 @@ Here are available services with prices {self.business_context.services}
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.order_text += ai_message + " "
-                        self.conversation.append(Message(role=Role.USER, message=ai_message))
+                        self.conversation.append(Message(role=Role.AI, message=ai_message))
                         logger.info(ai_message)
                         await self.reset_silence_timer()
 
