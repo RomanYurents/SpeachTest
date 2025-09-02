@@ -46,7 +46,7 @@ class CommunicationHandler:
     order_text = ""
     order_submitted = False
     closed_request_id = ""
-    voice_name = "shimmer"
+    voice_name = "echo"
     system_prompt = """
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take calls. Please assist the caller as best you can.
