@@ -143,40 +143,39 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         if self.business_context and self.business_context.is_open:
             parsed_order = await self.gpt_parse_order()
 
-            if parsed_order['customerName'] and parsed_order['orderItems']:
-                url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
-                headers = {
-                    "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
-                    "Content-Type": "application/json"
-                }
+            url = f"{os.getenv("AITELL_SERVER_URI")}/orders"
+            headers = {
+                "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
+                "Content-Type": "application/json"
+            }
 
-                payload = {
-                    "businessId": parsed_order.get("businessId", ""),
-                    "customerName": parsed_order.get("customerName", ""),
-                    "customerPhone": parsed_order.get("customerPhone", ""),
-                    "customerEmail": parsed_order.get("customerEmail", ""),
-                    "customerAddress": parsed_order.get("customerAddress", ""),
-                    "orderItems": parsed_order.get("orderItems", []),
-                    "totalAmount": parsed_order.get("totalAmount", 0),
-                    "currency": parsed_order.get("currency", "USD"),
-                    "conversationHistory": [
-                        {"role": m.role, "message": m.message} for m in self.conversation
-                    ],
-                    "specialInstructions": parsed_order.get("specialInstructions", ""),
-                    "estimatedCompletionTime": parsed_order.get(
-                        "estimatedCompletionTime",
-                        datetime.utcnow().isoformat() + "Z"
-                    ),
-                    "paymentMethod": parsed_order.get("paymentMethod", ""),
-                    "source": parsed_order.get("source", "phone"),
-                    "status": parsed_order.get("status", "unhandled")
-                }
+            payload = {
+                "businessId": parsed_order.get("businessId", ""),
+                "customerName": parsed_order.get("customerName", ""),
+                "customerPhone": parsed_order.get("customerPhone", ""),
+                "customerEmail": parsed_order.get("customerEmail", ""),
+                "customerAddress": parsed_order.get("customerAddress", ""),
+                "orderItems": parsed_order.get("orderItems", []),
+                "totalAmount": parsed_order.get("totalAmount", 0),
+                "currency": parsed_order.get("currency", "USD"),
+                "conversationHistory": [
+                    {"role": m.role, "message": m.message} for m in self.conversation
+                ],
+                "specialInstructions": parsed_order.get("specialInstructions", ""),
+                "estimatedCompletionTime": parsed_order.get(
+                    "estimatedCompletionTime",
+                    datetime.utcnow().isoformat() + "Z"
+                ),
+                "paymentMethod": parsed_order.get("paymentMethod", ""),
+                "source": parsed_order.get("source", "phone"),
+                "status": parsed_order.get("status", "unhandled")
+            }
 
-                logger.info(payload)
+            logger.info(payload)
 
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(url, json=payload, headers=headers)
-                    logger.info("Order endpoint status code:", response.status_code)
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, headers=headers)
+                logger.info("Order endpoint status code:", response.status_code)
 
     async def transfer_call_to_agent(self, agent_phone_number: str) -> bool:
         try:
