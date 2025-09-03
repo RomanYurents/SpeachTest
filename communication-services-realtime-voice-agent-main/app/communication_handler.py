@@ -314,11 +314,10 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                                 "type": "text",
                                 "text": f"""
 You are a smart assistant that extract order data from User-AI phone conversation text.
-Return your answer as a JSON object with the following fields:
 - customerName: the client's name from the conversation
 - customerEmail: use the fixed value "customer@gmail.com"
 - customerAddress: the client's address from the conversation
-- orderItems: list of ordered dishes, each containing:
+- orderItems: list of ordered dishes in final order, each containing:
    • item_id: id for current item from context
    • quantity: number of portions
 - currency: use "USD"
@@ -338,19 +337,30 @@ Here are available services with item_name and item_id {self.business_context.se
                     "content": [
                         {
                             "type": "text",
-                            "text": f"Conversation User-AI text: {self.order_text}"
+                            "text": f"Conversation User-AI text: {self.conversation}"
                         }
                     ]
                 }
             ]
 
-            logger.info(f"[Conversation transcript] - {self.order_text}")
             logger.info(f"[Conversation transcript] - {self.conversation}")
 
             messages = chat_prompt
 
+            valid_item_ids = []
+            if self.business_context and self.business_context.services:
+                import re
+                id_pattern = re.compile(r'ID: ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})')
+                valid_item_ids = id_pattern.findall(self.business_context.services)
+
+            if valid_item_ids:
+                ValidItemEnum = Enum('ValidItemEnum', {item_id: item_id for item_id in valid_item_ids})
+            else:
+                # Handle the case where there are no items
+                ValidItemEnum = Enum('ValidItemEnum', {'NO_ITEMS': 'no_items_available'})
+
             class OrderItem(BaseModel):
-                item_id: int = Field(..., description="Id for current item from context")
+                item_id: ValidItemEnum = Field(..., description="Id for current item from context")
                 quantity: int = Field(..., description="Amount of portions from conversation")
 
             class OrderData(BaseModel):
