@@ -312,19 +312,15 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                         [
                             {
                                 "type": "text",
-                                "text": f"""You are a smart assistant that extract order data from User-AI phone conversation text.
+                                "text": f"""
+You are a smart assistant that extract order data from User-AI phone conversation text.
 Return your answer as a JSON object with the following fields:
 - customerName: the client's name from the conversation
 - customerEmail: use the fixed value "customer@gmail.com"
 - customerAddress: the client's address from the conversation
 - orderItems: list of ordered dishes, each containing:
-   • name: dish name (e.g., Classic Caesar Salad)
+   • item_id: id for current item from context
    • quantity: number of portions
-   • unitPrice: price of one portion (decimal, 2 digits after the comma)
-   • totalPrice: total price for this item (decimal, 2 digits after the comma)
-   • category: either "Salat" or "Main dish"
-   • notes: leave as empty string
-- totalAmount: sum of all ordered items, decimal with 2 digits after the comma
 - currency: use "USD"
 - specialInstructions: leave as empty string
 - estimatedCompletionTime: leave as empty string
@@ -332,7 +328,7 @@ Return your answer as a JSON object with the following fields:
 - source: use "web"
 - status: use "confirmed"
 
-Here are available services with prices {self.business_context.services}
+Here are available services with item_name and item_id {self.business_context.services}
                     """
                             }
                         ]
@@ -354,12 +350,8 @@ Here are available services with prices {self.business_context.services}
             messages = chat_prompt
 
             class OrderItem(BaseModel):
-                name: str = Field(..., description="The name of dish from menu (e.g., Classic Caesar Salad)")
+                item_id: int = Field(..., description="Id for current item from context")
                 quantity: int = Field(..., description="Amount of portions from conversation")
-                unitPrice: float = Field(..., description="The price of dish from menu, always 2 digits after comma")
-                totalPrice: float = Field(..., description="The total price for this item, always 2 digits after comma")
-                category: str = Field(..., description="'Salat' or 'Main dish'")
-                notes: str = Field(..., description="Leave this field empty string")
 
             class OrderData(BaseModel):
                 customerName: str = Field(..., description="The name of client from conversation")

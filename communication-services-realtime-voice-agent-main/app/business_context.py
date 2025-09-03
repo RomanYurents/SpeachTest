@@ -160,15 +160,14 @@ class DatabaseManager:
                         else str(business.operating_hours)
                     )
 
-                    services_dict = {
-                        category.name: [item.title for item in category.items]
-                        for category in business.categories
-                    }
+                    services_list = []
+                    for category in business.categories:
+                        items_for_category = [
+                            f"{item.title} (ID: {item.id})" for item in category.items
+                        ]
+                        services_list.append(f"{category.name}: {', '.join(items_for_category)}")
 
-                    services_str = "\n".join(
-                        f"{category}: {', '.join(items)}"
-                        for category, items in services_dict.items()
-                    )
+                    services_str = "\n".join(services_list)
 
                     business_context = BusinessContext(
                         id=business.id,
