@@ -20,6 +20,7 @@ Base = declarative_base()
 
 logger = logging.getLogger(__name__)
 
+
 class Business(Base):
     __tablename__ = 'businesses'
 
@@ -34,6 +35,7 @@ class Business(Base):
     greeting_message = Column(Text)
     close_message = Column(Text)
     human_phone = Column(String(20))
+    default_ai_language = Column(String(10))
 
     categories = relationship(
         "CatalogCategory",
@@ -68,7 +70,8 @@ class CatalogItem(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text)
     price = Column(Numeric, nullable=False)
-    category_id = Column(UUID(as_uuid=True), ForeignKey('catalog_categories.id', ondelete='CASCADE', onupdate='CASCADE'))
+    category_id = Column(UUID(as_uuid=True),
+                         ForeignKey('catalog_categories.id', ondelete='CASCADE', onupdate='CASCADE'))
 
     category_rel = relationship("CatalogCategory", back_populates="items")
 
@@ -88,6 +91,7 @@ class BusinessContext:
     human_phone: str = None
     greeting_message: str = None
     close_message: str = None
+    default_ai_language: str = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -104,6 +108,7 @@ class BusinessContext:
             'services': self.services,
             'greeting_message': self.greeting_message,
             'close_message': self.close_message,
+            'default_ai_language': self.default_ai_language,
         }
 
 
@@ -182,6 +187,7 @@ class DatabaseManager:
                         greeting_message=business.greeting_message,
                         close_message=business.close_message,
                         human_phone=business.human_phone,
+                        default_ai_language=business.default_ai_language,
                     )
 
                     business_context.is_open = self._check_if_open(business_context.operating_hours)
@@ -254,14 +260,16 @@ class DatabaseManager:
 class PromptBuilder:
     @staticmethod
     def build_system_prompt(business_context: BusinessContext) -> str:
+        language_paragraph = f"- Always respond in {business_context.default_ai_language} language by default.\n-Only {business_context.default_ai_language} is allowed" if business_context.default_ai_language else """
+- Always respond in Swedish by default.  
+- If the user speaks English or ask you to speak in English, respond in English instead.  
+- Only Swedish and English are allowed in your responses.  """
         base_prompt = f"""
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take orders over a live phone call for {business_context.name}. 
 Your primary goal is to accurately and efficiently capture the customer's order and delivery details while maintaining a pleasant, conversational tone. 
 You are a helpful and efficient order-taker with a natural-sounding voice.  
-- Always respond in Swedish by default.  
-- If the user speaks English or ask you to speak in English, respond in English instead.  
-- Only Swedish and English are allowed in your responses.  
+{language_paragraph}
 
 {business_context.greeting_message}
 
