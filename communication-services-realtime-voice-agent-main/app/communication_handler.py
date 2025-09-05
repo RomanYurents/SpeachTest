@@ -22,8 +22,7 @@ from rtclient import (
     SessionUpdateMessage,
     ServerMessageType,
     UserMessageItem,
-    InputAudioBufferAppendMessage, FunctionCallOutputItem, ItemTruncateMessage,
-)
+    InputAudioBufferAppendMessage, FunctionCallOutputItem, )
 
 from app.business_context import BusinessContextManager
 
@@ -132,6 +131,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
 
     async def finish_conversation(self):
         logger.info("finish_conversation process...")
+        await asyncio.sleep(3)
         if not self.call_ended:
             try:
                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
@@ -415,28 +415,28 @@ Here are available services with item_name and item_id {self.business_context.se
                 match message.type:
                     case "input_audio_buffer.speech_started":
                         logger.info("Detected speech started.")
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
                     case "input_audio_buffer.speech_stopped":
                         logger.info("Detected speech started.")
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
                         self.order_text += user_message + " "
                         self.conversation.append(Message(role=Role.USER, message=user_message))
                         logger.info(user_message)
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.order_text += ai_message + " "
                         self.conversation.append(Message(role=Role.AI, message=ai_message))
                         logger.info(ai_message)
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
 
                     case "response.audio.delta":
                         await self.receive_audio(message.delta)
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
 
                     case "response.function_call_arguments.done":
                         logger.info(f"Received tool call: {message.name}")
@@ -446,7 +446,7 @@ Here are available services with item_name and item_id {self.business_context.se
                     case "response.done":
                         logger.info(
                             f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
-                        await self.reset_silence_timer()
+                        # await self.reset_silence_timer()
 
                     case "error":
                         logger.error(f"Error: {message.error}")

@@ -32,8 +32,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
-logging.getLogger("azure.monitor.opentelemetry.exporter").setLevel(logging.WARNING)
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.INFO)
+logging.getLogger("azure.monitor.opentelemetry.exporter").setLevel(logging.INFO)
 
 
 if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
