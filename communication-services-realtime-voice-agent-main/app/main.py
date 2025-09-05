@@ -19,6 +19,7 @@ from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import JSONResponse
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk._logs import LoggingHandler
 from opentelemetry.trace import (
     get_tracer_provider,
 )
@@ -32,8 +33,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.INFO)
-logging.getLogger("azure.monitor.opentelemetry.exporter").setLevel(logging.INFO)
+# logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.INFO)
+# logging.getLogger("azure.monitor.opentelemetry.exporter").setLevel(logging.INFO)
 
 
 if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
@@ -43,6 +44,9 @@ tracer = trace.get_tracer(__name__,
                           tracer_provider=get_tracer_provider())
 
 logger = logging.getLogger(__name__)
+
+otel_handler = LoggingHandler(level=logging.INFO)
+logger.addHandler(otel_handler)
 
 app = FastAPI()
 
