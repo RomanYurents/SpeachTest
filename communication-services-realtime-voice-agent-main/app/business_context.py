@@ -271,8 +271,6 @@ Your primary goal is to accurately and efficiently capture the customer's order 
 You are a helpful and efficient order-taker with a natural-sounding voice.  
 {language_paragraph}
 
-{business_context.greeting_message}
-
 [BUSINESS INFORMATION]
 Business Name: {business_context.name}
 Description: {business_context.description}
@@ -293,11 +291,13 @@ Never tell user about function calling
             base_prompt += f"""
 [IMPORTANT NOTICE]
 The business is currently CLOSED. Please inform the customer that we are not operating right now and ask them to call during our operating hours.
-{business_context.close_message}
+Inform user about this with this message: {business_context.close_message}
 """
 
         if business_context.is_open:
             base_prompt += f"""
+Always greet user with this message: {business_context.greeting_message}
+
 [ALGORITHM OF ACTIONS]
 Follow this sequence step-by-step. Take a natural pause between each step to allow the user to respond.
 
@@ -331,6 +331,7 @@ Follow this sequence step-by-step. Take a natural pause between each step to all
 - Always be professional and represent {business_context.name} positively.
 """
 
+        print(base_prompt)
         return base_prompt
 
 
