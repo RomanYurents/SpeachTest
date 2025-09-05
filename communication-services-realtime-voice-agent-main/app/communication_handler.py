@@ -131,7 +131,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
 
     async def finish_conversation(self):
         logger.info("finish_conversation process...")
-        await asyncio.sleep(3)
         if not self.call_ended:
             try:
                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
