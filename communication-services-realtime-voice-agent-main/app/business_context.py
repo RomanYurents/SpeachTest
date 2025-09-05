@@ -296,15 +296,13 @@ Inform user about this with this message: {business_context.close_message}
 
         if business_context.is_open:
             base_prompt += f"""
-Always greet user with this message: {business_context.greeting_message}
-
 [ALGORITHM OF ACTIONS]
 Follow this sequence step-by-step. Take a natural pause between each step to allow the user to respond.
 
 1. Initiate: Start with a friendly greeting mentioning the business name and ask if the customer would like to place an order.
-   - **Example:** "Hi there! Thanks for calling {business_context.name}. Can I help you with an order today?"
+   - Always greet user with this message: {business_context.greeting_message}
 
-2. Present Services: If they confirm, present available services based on the business description.
+2. Ask user: If they confirm, ask user what they want to order or how you can help them.
 
 3. Take Order: Listen to their selection. If quantity or specifics aren't mentioned, ask for clarification.
 
