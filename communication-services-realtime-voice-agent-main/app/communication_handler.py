@@ -37,14 +37,27 @@ class Role(str, Enum):
     AI = "ai"
     USER = "user"
 
+
 class Message(BaseModel):
     role: Role
     message: str
 
+
+async def stop_audio(websocket):
+    if websocket.open:
+        data = {
+            "Kind": "StopAudio",
+            "AudioData": None,
+            "StopAudio": {}
+        }
+        # Serialize the server streaming data
+        serialized_data = json.dumps(data)
+        print(f"Out Streaming Data ---> {serialized_data}")
+        # Send the chunk over the WebSocket
+        await websocket.send(serialized_data)
+
+
 class CommunicationHandler:
-    order_text = ""
-    order_submitted = False
-    closed_request_id = ""
     voice_name = "echo"
     system_prompt = """
 [ROLE AND GOAL]
@@ -68,7 +81,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
     """
     SILENCE_TIMEOUT = 10
     silence_task: asyncio.Task | None = None
-    conversation: List[Message] = []
 
     def __init__(self, websocket: WebSocket, call_connection_id: str, acs_client: CallAutomationClient,
                  phone_number: str = None, customer_phone: str = None) -> None:
@@ -103,10 +115,20 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             {
                 "type": "function",
                 "name": "finish_conversation",
-                "description": "Finish the conversation. Used when the conversation is finished — for example, when the user says goodbye, completes an order, or the call reaches its natural end. This function is used to hang up the call.",
+                "description": "Finish the conversation. Firstly say clode message - then call function. Used when the conversation is finished — for example, when the user says goodbye, completes an order, or the call reaches its natural end. This function is used to hang up the call.",
                 "parameters": {},
             }
         ]
+        self.ai_speaking = False
+        self.finish_requested = False
+
+        self.order_text = ""
+        self.order_submitted = False
+        self.closed_request_id = ""
+        self.conversation: List[Message] = []
+
+        self.start_time: datetime | None = None
+        self.end_time: datetime | None = None
 
     async def handle_tools(self, previous_item_id: str, call_id: str, tool_name: str, arguments: dict):
         if tool_name == "transfer_call":
@@ -125,13 +147,23 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     )
                 )
         elif tool_name == "finish_conversation":
-            await self.finish_conversation()
+            logger.info(f"Tool request: finish_conversation")
+            # await self.finish_conversation()
+            self.finish_requested = True
         else:
             logger.warning(f"Unknown tool request: {tool_name}")
 
     async def finish_conversation(self):
         logger.info("finish_conversation process...")
         if not self.call_ended:
+            if self.ai_speaking:
+                logger.info("AI is still speaking, delaying hangup...")
+                return
+
+            self.finish_requested = True
+            self.end_time = datetime.utcnow()
+            duration = (self.end_time - self.start_time).total_seconds() if self.start_time else 0
+            logger.info(f"Call {self.call_connection_id} duration: {duration:.1f} seconds")
             try:
                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
                 call_connection.hang_up(is_for_everyone=True)
@@ -148,11 +180,13 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     "Content-Type": "application/json"
                 }
 
+                email = parsed_order.get("customerEmail")
+
                 payload = {
                     "businessId": parsed_order.get("businessId", ""),
                     "customerName": parsed_order.get("customerName", ""),
                     "customerPhone": parsed_order.get("customerPhone", ""),
-                    "customerEmail": parsed_order.get("customerEmail", ""),
+                    "customerEmail": email if email.strip() else None,
                     "customerAddress": parsed_order.get("customerAddress", ""),
                     "orderItems": parsed_order.get("orderItems", []),
                     "currency": parsed_order.get("currency", "USD"),
@@ -174,6 +208,9 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 async with httpx.AsyncClient() as client:
                     response = await client.post(url, json=payload, headers=headers)
                     logger.info(f"Order endpoint status code: {response.status_code}")
+                    print(response.text)
+
+                self.call_ended = True
 
     async def transfer_call_to_agent(self, agent_phone_number: str) -> bool:
         try:
@@ -218,6 +255,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
             logger.warning("No phone number provided, using default prompt")
 
     async def start_conversation_async(self) -> None:
+        self.start_time = datetime.utcnow()
         await self.initialize_business_context()
 
         self.rt_client = RTLowLevelClient(
@@ -269,7 +307,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
         )
         await self.rt_client.send(message=initial_message)
 
-
     async def send_message_async(self, message: str) -> None:
         try:
             if self.active_websocket.client_state == WebSocketState.CONNECTED:
@@ -312,7 +349,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                                 "text": f"""
 You are a smart assistant that extract order data from User-AI phone conversation text.
 - customerName: the client's name from the conversation
-- customerEmail: use the fixed value "customer@gmail.com"
+- customerEmail: clients email from conversation or empty string ''
 - customerAddress: the client's address from the conversation
 - orderItems: list of ordered dishes in final order, each containing:
    • item_id: id for current item from context
@@ -414,6 +451,12 @@ Here are available services with item_name and item_id {self.business_context.se
                 match message.type:
                     case "input_audio_buffer.speech_started":
                         logger.info("Detected speech started.")
+                        audio_data = {
+                            "Kind": "StopAudio",
+                            "AudioData": None,
+                            "StopAudio": {}
+                        }
+                        await self.send_message_async(json.dumps(audio_data))
                         # await self.reset_silence_timer()
                     case "input_audio_buffer.speech_stopped":
                         logger.info("Detected speech started.")
@@ -434,6 +477,7 @@ Here are available services with item_name and item_id {self.business_context.se
                         # await self.reset_silence_timer()
 
                     case "response.audio.delta":
+                        self.ai_speaking = True
                         await self.receive_audio(message.delta)
                         # await self.reset_silence_timer()
 
@@ -443,6 +487,11 @@ Here are available services with item_name and item_id {self.business_context.se
                         await self.handle_tools(message.item_id, message.call_id, message.name, arguments)
 
                     case "response.done":
+                        self.ai_speaking = False
+
+                        if self.finish_requested:
+                            await asyncio.sleep(5)
+                            await self.finish_conversation()
                         logger.info(
                             f"Response Done: {message.response.id}; Closed request id: {self.closed_request_id}")
                         # await self.reset_silence_timer()
@@ -450,7 +499,7 @@ Here are available services with item_name and item_id {self.business_context.se
                     case "error":
                         logger.error(f"Error: {message.error}")
                     case _:
-                        print(message.type)
+                        pass
         except Exception as e:
             logger.error(f"Error in receive_messages_async: {e}")
             if not isinstance(e, asyncio.CancelledError):
@@ -473,7 +522,6 @@ Here are available services with item_name and item_id {self.business_context.se
                 type="input_audio_buffer.append", audio=audio_data, _is_azure=True
             )
         )
-
 
     async def say_and_hang_up(self, message: str) -> None:
         if self.call_ended:

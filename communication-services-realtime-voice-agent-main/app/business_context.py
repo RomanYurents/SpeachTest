@@ -168,7 +168,8 @@ class DatabaseManager:
                     services_list = []
                     for category in business.categories:
                         items_for_category = [
-                            f"{item.title} (ID: {item.id})" for item in category.items
+                            f"{item.title} (ID: {item.id}, Price: {item.price} {item.price})"
+                            for item in category.items
                         ]
                         services_list.append(f"{category.name}: {', '.join(items_for_category)}")
 
@@ -260,10 +261,14 @@ class DatabaseManager:
 class PromptBuilder:
     @staticmethod
     def build_system_prompt(business_context: BusinessContext) -> str:
-        language_paragraph = f"- Always respond in {business_context.default_ai_language} language by default.\n-Only {business_context.default_ai_language} is allowed" if business_context.default_ai_language else """
+        today = datetime.now().strftime("%A, %d %B %Y")
+
+        language_paragraph = f"- Always respond in {business_context.default_ai_language} language by default.\n-Only {business_context.default_ai_language} is allowed\n- Today is {today}." if business_context.default_ai_language else f"""
 - Always respond in Swedish by default.  
 - If the user speaks English or ask you to speak in English, respond in English instead.  
-- Only Swedish and English are allowed in your responses.  """
+- Only Swedish and English are allowed in your responses.  
+- Today is {today}.
+"""
         base_prompt = f"""
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take orders over a live phone call for {business_context.name}. 
@@ -292,6 +297,8 @@ Never tell user about function calling
 [IMPORTANT NOTICE]
 The business is currently CLOSED. Please inform the customer that we are not operating right now and ask them to call during our operating hours.
 Inform user about this with this message: {business_context.close_message}
+
+- Today is {today}.
 """
 
         if business_context.is_open:
@@ -329,7 +336,6 @@ Follow this sequence step-by-step. Take a natural pause between each step to all
 - Always be professional and represent {business_context.name} positively.
 """
 
-        print(base_prompt)
         return base_prompt
 
 
