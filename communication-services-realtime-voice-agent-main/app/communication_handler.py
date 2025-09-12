@@ -200,7 +200,8 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     ),
                     "paymentMethod": parsed_order.get("paymentMethod", ""),
                     "source": parsed_order.get("source", "phone"),
-                    "status": parsed_order.get("status", "unhandled")
+                    "status": parsed_order.get("status", "unhandled"),
+                    "conversationTime": duration
                 }
 
                 logger.info(payload)
