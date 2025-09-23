@@ -168,6 +168,8 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 call_connection = self.acs_client.get_call_connection(self.call_connection_id)
                 call_connection.hang_up(is_for_everyone=True)
                 logger.info(f"Call {self.call_connection_id} ended.")
+
+                self.call_ended = True
             except Exception as e:
                 logger.error(f"Failed to hang up call {self.call_connection_id}: {e}")
 
@@ -210,8 +212,6 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                     response = await client.post(url, json=payload, headers=headers)
                     logger.info(f"Order endpoint status code: {response.status_code}")
                     print(response.text)
-
-                self.call_ended = True
 
     async def transfer_call_to_agent(self, agent_phone_number: str) -> bool:
         try:
@@ -278,6 +278,7 @@ You are a friendly AI assistant designed to take calls. Please assist the caller
                 "input_audio_format": "pcm16",
                 "input_audio_transcription": {
                     "model": "whisper-1",
+                    "language": "sv"
                 },
                 "turn_detection": {
                     "threshold": 0.3,
