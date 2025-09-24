@@ -16,13 +16,13 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
     """Twilio implementation"""
     voice_name = "echo"
 
-    def __init__(self, websocket: WebSocket, stream_sid: str, twilio_client: Client,
+    def __init__(self, websocket: WebSocket, stream_sid: str, twilio_client: Client, call_sid: str,
                  phone_number: str = None, customer_phone: str = None):
         super().__init__(stream_sid, phone_number, customer_phone)
         self.websocket = websocket
         self.twilio_client = twilio_client
         self.stream_sid = stream_sid
-        self.call_sid = None  # Will be set later
+        self.call_sid = call_sid
         self.session_config = {
                 "type": "session.update",
                 "session": {

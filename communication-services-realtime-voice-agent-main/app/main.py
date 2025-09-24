@@ -327,6 +327,7 @@ async def twilio_media_stream_handler(websocket: WebSocket):
                     phone_number=callee_id,
                     customer_phone=caller_id,
                     twilio_client=twilio_client,
+                    call_sid=call_connection_id,
                 )
 
                 conversation_handler = UnifiedConversationHandler(comm_handler)
@@ -438,12 +439,12 @@ async def transfer_conversation(call_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main_upd:app",
-        host="localhost",
-        port=int(os.getenv("PORT", 8001)),
-        reload=True
-    )
+# if __name__ == "__main__":
+#     import uvicorn
+#
+#     uvicorn.run(
+#         "app.main:app",
+#         host="localhost",
+#         port=int(os.getenv("PORT", 8001)),
+#         reload=True
+#     )

@@ -32,7 +32,8 @@ class CommunicationHandlerFactory:
                 stream_sid=kwargs['stream_sid'],
                 twilio_client=kwargs['twilio_client'],
                 phone_number=kwargs.get('phone_number'),
-                customer_phone=kwargs.get('customer_phone')
+                customer_phone=kwargs.get('customer_phone'),
+                call_sid=kwargs.get('call_sid')
             )
 
         else:
