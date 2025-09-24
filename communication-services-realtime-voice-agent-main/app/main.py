@@ -146,7 +146,7 @@ async def azure_incoming_call_handler(request: Request):
     return JSONResponse({"message": "No relevant events processed"})
 
 
-@app.post("/api/callbacks/{contextId}")
+@app.post("/api/callbacks/acs/{contextId}")
 async def azure_handle_callback_with_context(contextId: str, request: Request):
     """Handle Azure Communication Services callbacks"""
     for event in await request.json():
