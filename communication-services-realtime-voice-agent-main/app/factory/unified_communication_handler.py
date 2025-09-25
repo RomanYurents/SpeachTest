@@ -16,6 +16,7 @@ from app.factory.base_communication_handler import BaseCommunicationHandler
 
 logger = logging.getLogger(__name__)
 
+
 class Role(str, Enum):
     AI = "ai"
     USER = "user"
@@ -24,6 +25,14 @@ class Role(str, Enum):
 class Message(BaseModel):
     role: Role
     message: str
+
+
+allowed_languages: List[str] = ['af', 'ar', 'az', 'be', 'bg', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'en', 'es',
+                                'et', 'fa', 'fi', 'fr', 'gl', 'he', 'hi', 'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja',
+                                'kk', 'kn', 'ko', 'lt', 'lv', 'mi', 'mk', 'mr', 'ms', 'ne', 'nl', 'no', 'pl', 'pt',
+                                'ro', 'ru', 'sk', 'sl', 'sr', 'sv', 'sw', 'ta', 'th', 'tl', 'tr', 'uk', 'ur', 'vi',
+                                'zh']
+
 
 class UnifiedConversationHandler:
     """Unified conversation handler that works with any communication provider"""
@@ -58,7 +67,7 @@ class UnifiedConversationHandler:
             },
             {
                 "type": "function",
-                "name": "finish_conversation",
+                "name": "hangup",
                 "description": "Finish the conversation and hang up the call",
                 "parameters": {},
             }
@@ -109,24 +118,39 @@ class UnifiedConversationHandler:
         self.comm_handler.session_config['session']['instructions'] = self.system_prompt
         self.comm_handler.session_config['session']['tools'] = self.tools
 
+        if self.business_context.default_ai_language in allowed_languages:
+            self.comm_handler.session_config['session']['language'] = self.business_context.default_ai_language
+        else:
+            self.comm_handler.session_config['session']['language'] = None
+
         await self.rt_client.send(SessionUpdateMessage(**self.comm_handler.session_config))
         await self.rt_client.send(ResponseCreateMessage())
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Handle tool calls"""
+
+        logger.info(f"Received tool call: {tool_name}")
+
         if tool_name == "transfer_call":
             reason = arguments.get("reason", "User requested transfer")
             if self.business_context and hasattr(self.business_context, 'human_phone'):
                 await self.comm_handler.transfer_call(
                     self.business_context.human_phone, reason
                 )
+            else:
+                logger.info("Business context not initialized or business context does not have human phone")
 
-        elif tool_name == "finish_conversation":
+        elif tool_name == "hangup":
             self.finish_requested = True
-            if not self.ai_speaking:
-                await self._finish_conversation()
+            for _ in range(50):
+                if not self.ai_speaking:
+                    break
+                logger.info("Wait before HANGUP. Ai is speaking...")
+                await asyncio.sleep(0.1)
 
-    async def _finish_conversation(self) -> None:
+            await self._hangup()
+
+    async def _hangup(self) -> None:
         """Finish the conversation"""
         try:
             # Save order data if applicable
@@ -212,7 +236,7 @@ class UnifiedConversationHandler:
         - specialInstructions: leave as empty string
         - estimatedCompletionTime: leave as empty string
         - paymentMethod: use "card"
-        - source: use "web"
+        - source: use "phone"
         - status: use "confirmed"
 
         Here are available services with item_name and item_id {self.business_context.services}
@@ -308,7 +332,7 @@ class UnifiedConversationHandler:
                         self.ai_speaking = False
                         if self.finish_requested:
                             await asyncio.sleep(2)  # Brief delay
-                            await self._finish_conversation()
+                            await self._hangup()
 
                     case "response.function_call_arguments.done":
                         arguments = json.loads(message.arguments)
@@ -342,8 +366,6 @@ class UnifiedConversationHandler:
 
     async def send_audio_async(self, audio_data: str) -> None:
         await self.comm_handler.send_audio_async(self.rt_client, audio_data)
-
-
 
 # Usage examples:
 
