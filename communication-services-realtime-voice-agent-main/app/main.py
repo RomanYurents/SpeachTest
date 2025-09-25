@@ -287,7 +287,7 @@ async def twilio_receive_call(request: Request):
 
     context_to_call_id[call_connection_id] = call_connection_id
 
-    host = request.headers.get("host")
+    host = os.getenv('CALLBACK_URI_HOST').replace("https://", "")
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
