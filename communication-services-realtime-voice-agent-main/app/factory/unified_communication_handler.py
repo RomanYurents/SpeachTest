@@ -72,6 +72,8 @@ class UnifiedConversationHandler:
                     self.comm_handler.phone_number
                 )
                 logger.info(f"Business context initialized for: {self.comm_handler.phone_number}")
+        else:
+            logger.warning(f"Phone number does not provided")
 
     async def start_conversation(self) -> None:
         """Start the conversation"""

@@ -194,6 +194,8 @@ class DatabaseManager:
                     business_context.is_open = self._check_if_open(business_context.operating_hours)
 
                     return business_context
+                else:
+                    logger.warning(f"Business context not found for phone: {phone}. Use default prompt")
 
                 return None
 

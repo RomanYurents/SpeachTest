@@ -260,7 +260,6 @@ async def azure_websocket_handler(websocket: WebSocket):
             del active_conversations[call_connection_id]
         if context_id in context_store:
             del context_store[context_id]
-        await websocket.close()
 
 
 # ==================== TWILIO ENDPOINTS ====================
