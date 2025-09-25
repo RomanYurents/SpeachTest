@@ -210,7 +210,7 @@ async def azure_initiate_call_handler(request: Request):
     return JSONResponse({"message": "Azure call initiated", "contextId": guid})
 
 
-@app.websocket("/acs/ws")
+@app.websocket("/ws")
 async def azure_websocket_handler(websocket: WebSocket):
     """Azure Communication Services WebSocket handler"""
     await websocket.accept()
