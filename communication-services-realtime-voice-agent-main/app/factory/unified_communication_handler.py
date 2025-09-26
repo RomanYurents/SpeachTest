@@ -46,6 +46,7 @@ class UnifiedConversationHandler:
         self.ai_speaking = False
         self.finish_requested = False
         self.tools = self._get_tools()
+        self.is_order = False
 
     def _get_tools(self) -> List[Dict[str, Any]]:
         """Get available tools for the conversation"""
@@ -153,12 +154,14 @@ class UnifiedConversationHandler:
     async def _hangup(self) -> None:
         """Finish the conversation"""
         try:
-            # Save order data if applicable
-            if self.business_context and self.business_context.is_open:
-                await self._save_order_data()
-
             # End the call
             await self.comm_handler.end_call()
+
+            # Save order data if applicable
+            if self.business_context and self.business_context.is_open and not self.is_order:
+                await self._save_order_data()
+
+                self.is_order = True
 
         except Exception as e:
             logger.error(f"Error finishing conversation: {e}")
