@@ -195,7 +195,7 @@ class DatabaseManager:
 
                     return business_context
                 else:
-                    logger.warning(f"Business context not found for phone: {phone}. Use default prompt")
+                    logger.error(f"Business context not found for phone: {phone}. Use default prompt")
 
                 return None
 

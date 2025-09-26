@@ -106,7 +106,7 @@ async def azure_incoming_call_handler(request: Request):
             incoming_call_context = event.data["incomingCallContext"]
             guid = str(uuid.uuid4())
 
-            logger.info(f"Azure incoming call: {caller_id} ➝ {callee_id}")
+            logger.error(f"Azure incoming call: {caller_id} ➝ {callee_id}")
 
             query_params = urlencode({"callerId": caller_id, "contextId": guid})
             callback_uri = f"{os.getenv('CALLBACK_URI_HOST')}/api/callbacks/acs/{guid}?{query_params}"
@@ -130,7 +130,7 @@ async def azure_incoming_call_handler(request: Request):
                 media_streaming=media_options,
             )
 
-            logger.info(f"Answered Azure call with ID: {answer_result.call_connection_id} for contextId: {guid}")
+            logger.error(f"Answered Azure call with ID: {answer_result.call_connection_id} for contextId: {guid}")
 
             # Store context information
             context_to_call_id[guid] = answer_result.call_connection_id
@@ -152,7 +152,7 @@ async def azure_handle_callback_with_context(contextId: str, request: Request):
     for event in await request.json():
         event_data = event["data"]
         call_id = event_data["callConnectionId"]
-        logger.info(f"Azure callback - Event: {event['type']}, Call ID: {call_id}")
+        logger.error(f"Azure callback - Event: {event['type']}, Call ID: {call_id}")
 
         # Update context mapping
         if contextId in context_store:
@@ -171,7 +171,7 @@ async def azure_initiate_call_handler(request: Request):
     guid = str(uuid.uuid4())
 
     if not acs_source_number:
-        logger.warning("ACS source number not configured")
+        logger.error("ACS source number not configured")
         return JSONResponse({"error": "ACS source number not configured"}, status_code=500)
 
     callback_uri = f"{os.getenv('CALLBACK_URI_HOST')}/api/callbacks/{guid}?contextId={guid}"
@@ -195,7 +195,7 @@ async def azure_initiate_call_handler(request: Request):
         media_streaming=media_options
     )
 
-    logger.info(
+    logger.error(
         f"Initiated Azure outbound call {answer_result.call_connection_id} to {callee_number} with contextId {guid}")
 
     context_store[guid] = {
@@ -226,7 +226,7 @@ async def azure_websocket_handler(websocket: WebSocket):
     callee_id = call_info.get("callee_id")
     call_connection_id = call_info.get("call_connection_id")
 
-    logger.info(f"Starting Azure WS session for Call ID: {call_connection_id}")
+    logger.error(f"Starting Azure WS session for Call ID: {call_connection_id}")
 
     try:
         comm_handler = CommunicationHandlerFactory.create_handler(
@@ -276,7 +276,7 @@ async def twilio_receive_call(request: Request):
     to_number = form.get("To")
     call_connection_id = form.get("CallSid")
 
-    logger.info(f"Starting WS session for Call ID: {from_number}, Callee: {to_number}")
+    logger.error(f"Starting WS session for Call ID: {from_number}, Callee: {to_number}")
 
     context_store[call_connection_id] = {
         "call_connection_id": call_connection_id,
@@ -317,7 +317,7 @@ async def twilio_media_stream_handler(websocket: WebSocket):
                 caller_id = context["caller_id"]
                 callee_id = context["callee_id"]
 
-                logger.info(f"Twilio call started: {call_connection_id} from {caller_id} to {callee_id}")
+                logger.error(f"Twilio call started: {call_connection_id} from {caller_id} to {callee_id}")
 
                 comm_handler = CommunicationHandlerFactory.create_handler(
                     CommunicationProvider.TWILIO,
@@ -339,7 +339,7 @@ async def twilio_media_stream_handler(websocket: WebSocket):
                 await conversation_handler.send_audio_async(audio_data)
 
             elif data.get("event") == "stop":
-                logger.info(f"Twilio call stopped: {call_connection_id}")
+                logger.error(f"Twilio call stopped: {call_connection_id}")
                 if call_connection_id in active_conversations:
                     await active_conversations[call_connection_id].comm_handler.end_call()
                     del active_conversations[call_connection_id]
@@ -348,7 +348,7 @@ async def twilio_media_stream_handler(websocket: WebSocket):
                 break
 
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected for call {call_connection_id}")
+        logger.error(f"WebSocket disconnected for call {call_connection_id}")
     except Exception as e:
         logger.error(f"Error in Twilio WS handler: {e}")
     finally:

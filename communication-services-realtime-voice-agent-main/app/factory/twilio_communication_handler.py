@@ -48,7 +48,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
         """Initialize Twilio call connection"""
         try:
             self.start_time = datetime.utcnow()
-            logger.info(f"Twilio call {self.call_id} initialized")
+            logger.error(f"Twilio call {self.call_id} initialized")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize Twilio call: {e}")
@@ -66,7 +66,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
             # End the call via Twilio API
             call = self.twilio_client.calls(self.call_sid).update(status="completed")
 
-            logger.info(f"Twilio call {self.call_sid} ended")
+            logger.error(f"Twilio call {self.call_sid} ended")
             return True
         except Exception as e:
             logger.error(f"Failed to end Twilio call: {e}")
@@ -87,7 +87,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
             call = self.twilio_client.calls(self.call_sid).update(twiml=twiml)
             self.call_ended = True
 
-            logger.info(f"Twilio call transferred to {target_number}")
+            logger.error(f"Twilio call transferred to {target_number}")
             return True
         except Exception as e:
             logger.error(f"Failed to transfer Twilio call: {e}")

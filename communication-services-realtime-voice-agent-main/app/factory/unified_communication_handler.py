@@ -81,9 +81,9 @@ class UnifiedConversationHandler:
                 self.business_context, self.system_prompt = await service.get_context_and_prompt(
                     self.comm_handler.phone_number
                 )
-                logger.info(f"Business context initialized for: {self.comm_handler.phone_number}")
+                logger.error(f"Business context initialized for: {self.comm_handler.phone_number}")
         else:
-            logger.warning(f"Phone number does not provided")
+            logger.error(f"Phone number does not provided")
 
     async def start_conversation(self) -> None:
         """Start the conversation"""
@@ -130,7 +130,7 @@ class UnifiedConversationHandler:
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Handle tool calls"""
 
-        logger.info(f"Received tool call: {tool_name}")
+        logger.error(f"Received tool call: {tool_name}")
 
         if tool_name == "transfer_call":
             reason = arguments.get("reason", "User requested transfer")
@@ -139,14 +139,14 @@ class UnifiedConversationHandler:
                     self.business_context.human_phone, reason
                 )
             else:
-                logger.info("Business context not initialized or business context does not have human phone")
+                logger.error("Business context not initialized or business context does not have human phone")
 
         elif tool_name == "hangup":
             self.finish_requested = True
             for _ in range(50):
                 if not self.ai_speaking:
                     break
-                logger.info("Wait before HANGUP. Ai is speaking...")
+                logger.error("Wait before HANGUP. Ai is speaking...")
                 await asyncio.sleep(0.1)
 
             await self._hangup()
@@ -204,7 +204,7 @@ class UnifiedConversationHandler:
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers)
-                logger.info(f"Order saved: {response.status_code}")
+                logger.error(f"Order saved: {response.status_code}")
 
         except Exception as e:
             logger.error(f"Failed to save order: {e}")
@@ -258,7 +258,7 @@ class UnifiedConversationHandler:
                 }
             ]
 
-            logger.info(f"[Conversation transcript] - {self.conversation}")
+            logger.error(f"[Conversation transcript] - {self.conversation}")
 
             messages = chat_prompt
 
@@ -342,20 +342,20 @@ class UnifiedConversationHandler:
                         await self.handle_tool_call(message.name, arguments)
 
                     case "input_audio_buffer.speech_stopped":
-                        logger.info("Detected speech started.")
+                        logger.error("Detected speech started.")
                         # await self.reset_silence_timer()
 
                     case "conversation.item.input_audio_transcription.completed":
                         transcript = message.transcript.lower()
                         user_message = f"User: {transcript}"
                         self.conversation.append(Message(role=Role.USER, message=user_message))
-                        logger.info(user_message)
+                        logger.error(user_message)
                         # await self.reset_silence_timer()
 
                     case "response.audio_transcript.done":
                         ai_message = f"AI: {message.transcript}"
                         self.conversation.append(Message(role=Role.AI, message=ai_message))
-                        logger.info(ai_message)
+                        logger.error(ai_message)
                         # await self.reset_silence_timer()
 
                     case "error":

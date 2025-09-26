@@ -48,7 +48,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
         """Initialize Azure call connection"""
         try:
             self.start_time = datetime.utcnow()
-            logger.info(f"Azure call {self.call_id} initialized")
+            logger.error(f"Azure call {self.call_id} initialized")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize Azure call: {e}")
@@ -66,7 +66,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
             call_connection = self.acs_client.get_call_connection(self.call_connection_id)
             call_connection.hang_up(is_for_everyone=True)
 
-            logger.info(f"Azure call {self.call_id} ended")
+            logger.error(f"Azure call {self.call_id} ended")
             return True
         except Exception as e:
             logger.error(f"Failed to end Azure call: {e}")
@@ -86,7 +86,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
             )
 
             self.call_ended = True
-            logger.info(f"Azure call transferred: {transfer_result}")
+            logger.error(f"Azure call transferred: {transfer_result}")
             return True
         except Exception as e:
             logger.error(f"Failed to transfer Azure call: {e}")
