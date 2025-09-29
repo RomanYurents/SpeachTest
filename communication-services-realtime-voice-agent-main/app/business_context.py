@@ -36,6 +36,7 @@ class Business(Base):
     close_message = Column(Text)
     human_phone = Column(String(20))
     default_ai_language = Column(String(10))
+    tonality = Column(Text)
 
     categories = relationship(
         "CatalogCategory",
@@ -92,6 +93,7 @@ class BusinessContext:
     greeting_message: str = None
     close_message: str = None
     default_ai_language: str = None
+    tonality: str = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -109,6 +111,7 @@ class BusinessContext:
             'greeting_message': self.greeting_message,
             'close_message': self.close_message,
             'default_ai_language': self.default_ai_language,
+            'tonality': self.tonality,
         }
 
 
@@ -189,6 +192,7 @@ class DatabaseManager:
                         close_message=business.close_message,
                         human_phone=business.human_phone,
                         default_ai_language=business.default_ai_language,
+                        tonality=business.tonality,
                     )
 
                     business_context.is_open = self._check_if_open(business_context.operating_hours)
@@ -269,8 +273,17 @@ class PromptBuilder:
 - Always respond in Swedish by default.  
 - If the user speaks English or ask you to speak in English, respond in English instead.  
 - Only Swedish and English are allowed in your responses.  
-- Today is {today}.
 """
+        tonality_paragraph = business_context.tonality if business_context.tonality else f"""
+- Conversational Tone: Be friendly and natural.
+- Concise Responses: Keep responses short, ideally under two sentences at a time.
+- Natural Pacing: Use natural pauses and be ready to be interrupted.
+- Small Fillers: Use conversational markers like "Okay, so...", "Right...", "Let's see...", "Sounds good!".
+- Check-ins: Use brief questions to ensure understanding.
+- If user says bye, goodbye, thats all and other things that indicate the end of the call and the user's unwillingness to communicate - call the 'hangup' function
+- If user says that he want to talk with manager, human or reconnect him - call function 'transfer_call' to connect user to manager.
+"""
+
         base_prompt = f"""
 [ROLE AND GOAL]
 You are a friendly AI assistant designed to take orders over a live phone call for {business_context.name}. 
@@ -284,6 +297,8 @@ Description: {business_context.description}
 Location: {business_context.address}, {business_context.city}, {business_context.country}
 Phone: {business_context.phone}
 Operating Hours: {business_context.operating_hours}
+
+- Today is {today}.
 
 Business provides ONLY these services, you MUST NOT invent or propose anything outside this list:
 {business_context.services}
@@ -336,13 +351,7 @@ Follow these steps to efficiently manage the call. The steps are a sequence of g
  - use function 'transfer_call' - don't tell user about this tool.
 
 [TONE AND STYLE OF COMMUNICATION]
-- Conversational Tone: Be friendly and natural.
-- Concise Responses: Keep responses short, ideally under two sentences at a time.
-- Natural Pacing: Use natural pauses and be ready to be interrupted.
-- Small Fillers: Use conversational markers like "Okay, so...", "Right...", "Let's see...", "Sounds good!".
-- Check-ins: Use brief questions to ensure understanding.
-- If user says bye, goodbye, thats all and other things that indicate the end of the call and the user's unwillingness to communicate - call the 'hangup' function
-- If user says that he want to talk with manager, human or reconnect him - call function 'transfer_call' to connect user to manager.
+{tonality_paragraph}
 
 [IMPORTANT]
 - **TOP PRIORITY:** **NEVER ignore a direct question from the user.** If the user asks about delivery time, cost, or anything else, stop the ordering process and answer the question immediately. Only resume order-taking after the question is resolved.

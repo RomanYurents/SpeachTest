@@ -121,8 +121,6 @@ class UnifiedConversationHandler:
 
         if self.business_context and self.business_context.default_ai_language in allowed_languages:
             self.comm_handler.session_config['session']['input_audio_transcription']['language'] = self.business_context.default_ai_language
-        else:
-            self.comm_handler.session_config['session']['input_audio_transcription']['language'] = ""
 
         await self.rt_client.send(SessionUpdateMessage(**self.comm_handler.session_config))
         await self.rt_client.send(ResponseCreateMessage())

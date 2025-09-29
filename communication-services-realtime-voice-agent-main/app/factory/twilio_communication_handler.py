@@ -29,8 +29,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
                     "voice": self.voice_name,
                     "input_audio_format": "g711_ulaw",
                     "input_audio_transcription": {
-                        "model": "whisper-1",
-                        "language": "sv"
+                        "model": "whisper-1"
                     },
                     "output_audio_format": "g711_ulaw",
                     "turn_detection": {
