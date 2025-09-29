@@ -39,20 +39,22 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
-    configure_azure_monitor()
-
-tracer = trace.get_tracer(__name__,
-                          tracer_provider=get_tracer_provider())
-
 logger = logging.getLogger(__name__)
 
-otel_handler = LoggingHandler(level=logging.INFO)
-logger.addHandler(otel_handler)
 
 app = FastAPI()
 
-FastAPIInstrumentor.instrument_app(app)
+if os.getenv("ENV") == "prod" and os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    configure_azure_monitor()
+    otel_handler = LoggingHandler(level=logging.INFO)
+    if not any(isinstance(h, LoggingHandler) for h in logger.handlers):
+        logger.addHandler(otel_handler)
+
+    FastAPIInstrumentor.instrument_app(app)
+
+    logger.info("Azure Application Insights tracing enabled")
+else:
+    logger.info("Running locally, Azure tracing disabled")
 
 # Azure Communication Services setup
 acs_ca_client = CallAutomationClient.from_connection_string(os.getenv("ACS_CONNECTION_STRING"))
@@ -257,6 +259,8 @@ async def azure_websocket_handler(websocket: WebSocket):
         logger.error(f"Error in Azure WebSocket handler: {e}")
     finally:
         if call_connection_id in active_conversations:
+            active_conversations[call_connection_id].comm_handler.is_closed = True
+            active_conversations[call_connection_id].rt_client.close()
             del active_conversations[call_connection_id]
         if context_id in context_store:
             del context_store[context_id]
@@ -341,7 +345,8 @@ async def twilio_media_stream_handler(websocket: WebSocket):
             elif data.get("event") == "stop":
                 logger.error(f"Twilio call stopped: {call_connection_id}")
                 if call_connection_id in active_conversations:
-                    await active_conversations[call_connection_id].comm_handler.end_call()
+                    active_conversations[call_connection_id].comm_handler.is_closed = True
+                    await active_conversations[call_connection_id].rt_client.close()
                     del active_conversations[call_connection_id]
                 if call_connection_id in context_store:
                     del context_store[call_connection_id]
