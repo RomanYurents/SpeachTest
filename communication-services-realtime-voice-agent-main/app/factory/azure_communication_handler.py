@@ -43,6 +43,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
                 "tool_choice": "auto"
             },
         }
+        self.is_closed = False
 
     async def initialize_call(self) -> bool:
         """Initialize Azure call connection"""
@@ -113,7 +114,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
 
     async def send_message_async(self, message: str) -> None:
         try:
-            if self.websocket.client_state == WebSocketState.CONNECTED:
+            if self.websocket.client_state == WebSocketState.CONNECTED and not self.is_closed:
                 await self.websocket.send_text(message)
         except Exception as e:
             logger.error((f"Send Message - Failed to send message: {e}"))

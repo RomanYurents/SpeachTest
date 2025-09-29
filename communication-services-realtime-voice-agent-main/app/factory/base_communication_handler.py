@@ -30,6 +30,7 @@ class BaseCommunicationHandler(ABC):
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
         self.session_config = None
+        self.is_closed = False
 
     @abstractmethod
     async def initialize_call(self) -> bool:
