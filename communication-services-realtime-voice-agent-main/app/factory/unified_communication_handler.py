@@ -122,7 +122,7 @@ class UnifiedConversationHandler:
         if self.business_context and self.business_context.default_ai_language in allowed_languages:
             self.comm_handler.session_config['session']['input_audio_transcription']['language'] = self.business_context.default_ai_language
         else:
-            self.comm_handler.session_config['session']['input_audio_transcription']['language'] = None
+            self.comm_handler.session_config['session']['input_audio_transcription']['language'] = ""
 
         await self.rt_client.send(SessionUpdateMessage(**self.comm_handler.session_config))
         await self.rt_client.send(ResponseCreateMessage())
@@ -342,7 +342,12 @@ class UnifiedConversationHandler:
                         await self.handle_tool_call(message.name, arguments)
 
                     case "input_audio_buffer.speech_stopped":
-                        logger.error("Detected speech started.")
+                        logger.error("Detected speech stopped.")
+                        # await self.reset_silence_timer()
+
+                    case "input_audio_buffer.speech_started":
+                        logger.info("Detected speech started.")
+                        await self.comm_handler.stop_audio()
                         # await self.reset_silence_timer()
 
                     case "conversation.item.input_audio_transcription.completed":

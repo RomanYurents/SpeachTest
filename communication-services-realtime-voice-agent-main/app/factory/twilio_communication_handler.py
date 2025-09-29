@@ -130,3 +130,16 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
             await self.send_message_async(json.dumps(audio_data))
         except Exception as e:
             logger.error(f"Error sending audio: {e}")
+
+    async def stop_audio(self) -> None:
+        """Stop audio playback in Twilio media stream"""
+        try:
+            stop_message = {
+                "event": "clear",
+                "streamSid": self.stream_sid
+            }
+            await self.send_message_async(json.dumps(stop_message))
+            logger.info(f"Stopped audio for Twilio stream {self.stream_sid}")
+        except Exception as e:
+            logger.error(f"Error stopping Twilio audio: {e}")
+

@@ -138,6 +138,6 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
                 "AudioData": None,
                 "StopAudio": {}
             }
-            await self.websocket.send_text(json.dumps(stop_message))
+            await self.send_message_async(json.dumps(stop_message))
         except Exception as e:
             logger.error(f"Error stopping Azure audio: {e}")

@@ -55,6 +55,10 @@ class BaseCommunicationHandler(ABC):
     async def receive_audio(self, data_payload) -> None:
        pass
 
+    @abstractmethod
+    async def stop_audio(self) -> None:
+        pass
+
     async def get_call_duration(self) -> float:
         """Get call duration in seconds"""
         if self.start_time and self.end_time:
