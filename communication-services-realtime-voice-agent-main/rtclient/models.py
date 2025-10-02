@@ -14,7 +14,7 @@ from pydantic import (
 
 from rtclient.util.model_helpers import ModelWithDefaults
 
-Voice = Literal["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "cedar"]
+Voice = Literal["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "cedar", "marin"]
 AudioFormat = Literal["pcm16", "g711_ulaw", "g711_alaw"]
 Modality = Literal["text", "audio"]
 
@@ -44,7 +44,7 @@ MessageRole = Literal["system", "assistant", "user"]
 
 
 class InputAudioTranscription(BaseModel):
-    model: Literal["whisper-1"]
+    model: Literal["whisper-1", "gpt-4o-mini-transcribe", "azure-speech"]
     language: Optional[str] = None
 
 

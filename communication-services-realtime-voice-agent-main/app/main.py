@@ -178,7 +178,7 @@ async def azure_initiate_call_handler(request: Request):
 
     callback_uri = f"{os.getenv('CALLBACK_URI_HOST')}/api/callbacks/{guid}?contextId={guid}"
     parsed_url = urlparse(os.getenv("CALLBACK_URI_HOST"))
-    websocket_url = urlunparse(("wss", parsed_url.netloc, "/acs/ws", "", "", "")) + f"?contextId={guid}"
+    websocket_url = urlunparse(("wss", parsed_url.netloc, "/ws", "", "", "")) + f"?contextId={guid}"
 
     media_options = MediaStreamingOptions(
         transport_url=websocket_url,

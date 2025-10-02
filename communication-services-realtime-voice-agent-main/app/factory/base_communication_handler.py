@@ -29,8 +29,8 @@ class BaseCommunicationHandler(ABC):
         self.call_ended = False
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
-        self.session_config = None
         self.is_closed = False
+        self.audio_format = None
 
     @abstractmethod
     async def initialize_call(self) -> bool:

@@ -23,25 +23,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
         self.twilio_client = twilio_client
         self.stream_sid = stream_sid
         self.call_sid = call_sid
-        self.session_config = {
-                "type": "session.update",
-                "session": {
-                    "voice": self.voice_name,
-                    "input_audio_format": "g711_ulaw",
-                    "input_audio_transcription": {
-                        "model": "whisper-1"
-                    },
-                    "output_audio_format": "g711_ulaw",
-                    "turn_detection": {
-                        "type": "server_vad",
-                        "threshold": 0.5,
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 200
-                    },
-                    "tool_choice": "auto"
-                    # "temperature": TEMPERATURE
-                }
-            }
+        self.audio_format = "g711_ulaw"
         self.is_closed = False
 
     async def initialize_call(self) -> bool:

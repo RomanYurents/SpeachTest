@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 class AzureCommunicationHandler(BaseCommunicationHandler):
     """Azure Communication Services implementation"""
-    voice_name = "cedar"
 
     def __init__(self, websocket: WebSocket, call_connection_id: str,
                  acs_client: CallAutomationClient, phone_number: str = None,
@@ -23,25 +22,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
         self.websocket = websocket
         self.acs_client = acs_client
         self.call_connection_id = call_connection_id
-        self.session_config = {
-            "type": "session.update",
-            "session": {
-                "voice": self.voice_name,
-                # "instructions": self.system_prompt,
-                "input_audio_format": "pcm16",
-                "input_audio_transcription": {
-                    "model": "whisper-1"
-                },
-                "turn_detection": {
-                    "threshold": 0.3,
-                    "silence_duration_ms": 300,
-                    "prefix_padding_ms": 500,
-                    "type": "server_vad",
-                },
-                # "tools": self.tools,
-                "tool_choice": "auto"
-            },
-        }
+        self.audio_format = "pcm16"
         self.is_closed = False
 
     async def initialize_call(self) -> bool:

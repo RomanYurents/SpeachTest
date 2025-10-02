@@ -41,12 +41,19 @@ class UnifiedConversationHandler:
         self.comm_handler = comm_handler
         self.rt_client = None
         self.business_context = None
-        self.system_prompt = "speak ukrainian"
+        self.system_prompt = "An error occurred, can not load context from db"
         self.conversation = []
         self.ai_speaking = False
         self.finish_requested = False
         self.tools = self._get_tools()
         self.is_order = False
+
+        self.voice = os.getenv("SESSION_VOICE", "cedar")
+        self.threshold = float(os.getenv("SESSION_TURN_THRESHOLD", 0.3))
+        self.silence_duration = int(os.getenv("SESSION_SILENCE_DURATION_MS", 300))
+        self.prefix_padding = int(os.getenv("SESSION_PREFIX_PADDING_MS", 500))
+        self.input_audio_transcription_model = os.getenv("INPUT_AUDIO_TRANSCRIPTION_MODEL", 'whisper-1')
+        self.turn_detection_type = os.getenv("TURN_DETECTION_TYPE", 'server_vad')
 
     def _get_tools(self) -> List[Dict[str, Any]]:
         """Get available tools for the conversation"""
@@ -116,13 +123,30 @@ class UnifiedConversationHandler:
 
         await self.rt_client.connect()
 
-        self.comm_handler.session_config['session']['instructions'] = self.system_prompt
-        self.comm_handler.session_config['session']['tools'] = self.tools
+        upd_session = {
+            "type": "session.update",
+            "session": {
+                "voice": self.voice,
+                "instructions": self.system_prompt,
+                "input_audio_format": self.comm_handler.audio_format,
+                "input_audio_transcription": {
+                    "model": self.input_audio_transcription_model
+                },
+                "turn_detection": {
+                    "threshold": self.threshold,
+                    "silence_duration_ms": self.silence_duration,
+                    "prefix_padding_ms": self.prefix_padding,
+                    "type": self.turn_detection_type
+                },
+                "tools": self.tools,
+                "tool_choice": "auto"
+            },
+        }
 
         if self.business_context and self.business_context.default_ai_language in allowed_languages:
-            self.comm_handler.session_config['session']['input_audio_transcription']['language'] = self.business_context.default_ai_language
+            upd_session['session']['input_audio_transcription']['language'] = self.business_context.default_ai_language
 
-        await self.rt_client.send(SessionUpdateMessage(**self.comm_handler.session_config))
+        await self.rt_client.send(SessionUpdateMessage(**upd_session))
         await self.rt_client.send(ResponseCreateMessage())
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
