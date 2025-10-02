@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Dict, Any
 
 import httpx
+from dotenv import load_dotenv
 from openai import AsyncAzureOpenAI
 from pydantic import BaseModel, Field
 from rtclient import RTLowLevelClient, SessionUpdateMessage, ResponseCreateMessage
@@ -33,6 +34,7 @@ allowed_languages: List[str] = ['af', 'ar', 'az', 'be', 'bg', 'bs', 'ca', 'cs', 
                                 'ro', 'ru', 'sk', 'sl', 'sr', 'sv', 'sw', 'ta', 'th', 'tl', 'tr', 'uk', 'ur', 'vi',
                                 'zh']
 
+load_dotenv()
 
 class UnifiedConversationHandler:
     """Unified conversation handler that works with any communication provider"""
