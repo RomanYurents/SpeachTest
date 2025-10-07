@@ -260,7 +260,7 @@ async def azure_websocket_handler(websocket: WebSocket):
     finally:
         if call_connection_id in active_conversations:
             active_conversations[call_connection_id].comm_handler.is_closed = True
-            active_conversations[call_connection_id].rt_client.close()
+            await active_conversations[call_connection_id].rt_client.close()
             del active_conversations[call_connection_id]
         if context_id in context_store:
             del context_store[context_id]
