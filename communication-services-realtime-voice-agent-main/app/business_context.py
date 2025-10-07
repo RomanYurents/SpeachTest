@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Optional, Dict, Any
 
+import httpx
 import pytz
 from dotenv import load_dotenv
 from sqlalchemy import Column, String, Text, JSON, ForeignKey, Numeric, UUID
@@ -153,62 +154,113 @@ class DatabaseManager:
 
     async def get_business_by_phone(self, phone: str) -> Optional[BusinessContext]:
         try:
-            async with self.async_session_factory() as session:
-                stmt = select(Business).options(
-                    selectinload(Business.categories).selectinload(CatalogCategory.items)
-                ).where(Business.phone == phone)
+            url = f"{os.getenv('AITELL_SERVER_URI')}/public/businesses/by-phone?phone=+4570715810"
+            print(url)
+            headers = {
+                "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
+                "Content-Type": "application/json"
+            }
 
-                result = await session.execute(stmt)
-                business = result.scalar_one_or_none()
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers)
 
-                if business:
-                    operating_hours_str = (
-                        json.dumps(business.operating_hours)
-                        if isinstance(business.operating_hours, dict)
-                        else str(business.operating_hours)
-                    )
+                if response.status_code != 200:
+                    logger.error(f"Failed to fetch business: {response.status_code} {response.text}")
+                    return None
 
-                    services_list = []
-                    for category in business.categories:
-                        items_for_category = [
-                            f"{item.title} (ID: {item.id}, Price: {item.price} {item.price})"
-                            for item in category.items
-                        ]
-                        services_list.append(f"{category.name}: {', '.join(items_for_category)}")
+                data = response.json()
+                if not data:
+                    logger.error(f"No business data returned for phone: {phone}")
+                    return None
 
-                    services_str = "\n".join(services_list)
+                business_context = BusinessContext(
+                    id=data.get("id"),
+                    name=data.get("name"),
+                    description=data.get("description") or "",
+                    address=data.get("address") or "",
+                    city=data.get("city") or "",
+                    country=data.get("country") or "",
+                    operating_hours=json.dumps(data.get("operatingHours")) if isinstance(data.get("operatingHours"),
+                                                                                         dict) else str(
+                        data.get("operatingHours")),
+                    phone=data.get("phone"),
+                    services="\n".join(data.get("services", [])),
+                    greeting_message=data.get("greetingMessage"),
+                    close_message=data.get("closeMessage"),
+                    human_phone=data.get("humanPhone"),
+                    default_ai_language=data.get("defaultAiLanguage"),
+                    tonality=data.get("tonality"),
+                )
 
-                    business_context = BusinessContext(
-                        id=business.id,
-                        name=business.name,
-                        description=business.description or "",
-                        address=business.address or "",
-                        city=business.city or "",
-                        country=business.country or "",
-                        operating_hours=operating_hours_str,
-                        phone=business.phone,
-                        services=services_str,
-                        greeting_message=business.greeting_message,
-                        close_message=business.close_message,
-                        human_phone=business.human_phone,
-                        default_ai_language=business.default_ai_language,
-                        tonality=business.tonality,
-                    )
+                business_context.is_open = self._check_if_open(business_context.operating_hours)
 
-                    business_context.is_open = self._check_if_open(business_context.operating_hours)
+                return business_context
 
-                    return business_context
-                else:
-                    logger.error(f"Business context not found for phone: {phone}. Use default prompt")
-
-                return None
-
-        except SQLAlchemyError as e:
-            logger.error(f"Database error: {e}")
+        except httpx.RequestError as e:
+            logger.error(f"HTTP request error: {e}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error fetching business data: {e}")
             return None
+
+    # async def get_business_by_phone(self, phone: str) -> Optional[BusinessContext]:
+    #     try:
+    #         async with self.async_session_factory() as session:
+    #             stmt = select(Business).options(
+    #                 selectinload(Business.categories).selectinload(CatalogCategory.items)
+    #             ).where(Business.phone == phone)
+    #
+    #             result = await session.execute(stmt)
+    #             business = result.scalar_one_or_none()
+    #
+    #             if business:
+    #                 operating_hours_str = (
+    #                     json.dumps(business.operating_hours)
+    #                     if isinstance(business.operating_hours, dict)
+    #                     else str(business.operating_hours)
+    #                 )
+    #
+    #                 services_list = []
+    #                 for category in business.categories:
+    #                     items_for_category = [
+    #                         f"{item.title} (ID: {item.id}, Price: {item.price} {item.price})"
+    #                         for item in category.items
+    #                     ]
+    #                     services_list.append(f"{category.name}: {', '.join(items_for_category)}")
+    #
+    #                 services_str = "\n".join(services_list)
+    #
+    #                 business_context = BusinessContext(
+    #                     id=business.id,
+    #                     name=business.name,
+    #                     description=business.description or "",
+    #                     address=business.address or "",
+    #                     city=business.city or "",
+    #                     country=business.country or "",
+    #                     operating_hours=operating_hours_str,
+    #                     phone=business.phone,
+    #                     services=services_str,
+    #                     greeting_message=business.greeting_message,
+    #                     close_message=business.close_message,
+    #                     human_phone=business.human_phone,
+    #                     default_ai_language=business.default_ai_language,
+    #                     tonality=business.tonality,
+    #                 )
+    #
+    #                 business_context.is_open = self._check_if_open(business_context.operating_hours)
+    #
+    #                 return business_context
+    #             else:
+    #                 logger.error(f"Business context not found for phone: {phone}. Use default prompt")
+    #
+    #             return None
+    #
+    #     except SQLAlchemyError as e:
+    #         logger.error(f"Database error: {e}")
+    #         return None
+    #     except Exception as e:
+    #         logger.error(f"Unexpected error fetching business data: {e}")
+    #         return None
 
     async def close(self):
         await self.engine.dispose()
