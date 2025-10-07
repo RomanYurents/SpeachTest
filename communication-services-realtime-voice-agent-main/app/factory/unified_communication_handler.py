@@ -141,6 +141,7 @@ class UnifiedConversationHandler:
                 "voice": self.voice,
                 "instructions": self.system_prompt,
                 "input_audio_format": self.comm_handler.audio_format,
+                "output_audio_format": self.comm_handler.audio_format,
                 "input_audio_transcription": {
                     "model": self.input_audio_transcription_model
                 },
@@ -236,7 +237,22 @@ class UnifiedConversationHandler:
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers)
-                logger.error(f"Order saved: {response.status_code}")
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    logger.error(
+                        f"Failed to save order: {exc.response.status_code} - {exc.response.text}"
+                    )
+
+                    try:
+                        err_data = exc.response.json()
+                        message = err_data.get("message", "Unknown error")
+                    except Exception:
+                        message = exc.response.text
+
+                    raise Exception(f"Order not saved: {message}")
+                else:
+                    logger.info(f"Order saved successfully: {response.status_code}")
 
         except Exception as e:
             logger.error(f"Failed to save order: {e}")
