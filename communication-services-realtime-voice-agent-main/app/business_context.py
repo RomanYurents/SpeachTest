@@ -154,7 +154,7 @@ class DatabaseManager:
 
     async def get_business_by_phone(self, phone: str) -> Optional[BusinessContext]:
         try:
-            url = f"{os.getenv('AITELL_SERVER_URI')}/public/businesses/by-phone?phone=+4570715810"
+            url = f"{os.getenv('AITELL_SERVER_URI')}/public/businesses/by-phone?phone={phone}"
             print(url)
             headers = {
                 "x-api-key": os.getenv("AITELL_SERVER_API_KEY"),
