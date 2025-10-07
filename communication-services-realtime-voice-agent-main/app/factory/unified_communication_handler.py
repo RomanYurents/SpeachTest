@@ -125,6 +125,16 @@ class UnifiedConversationHandler:
 
         await self.rt_client.connect()
 
+        turn_detection_config = {"type": self.turn_detection_type}
+
+        if self.turn_detection_type == "server_vad":
+            # Для server VAD можна передавати параметри
+            turn_detection_config.update({
+                "threshold": self.threshold,
+                "silence_duration_ms": self.silence_duration,
+                "prefix_padding_ms": self.prefix_padding
+            })
+
         upd_session = {
             "type": "session.update",
             "session": {
@@ -134,11 +144,9 @@ class UnifiedConversationHandler:
                 "input_audio_transcription": {
                     "model": self.input_audio_transcription_model
                 },
-                "turn_detection": {
-                    "threshold": self.threshold,
-                    "silence_duration_ms": self.silence_duration,
-                    "prefix_padding_ms": self.prefix_padding,
-                    "type": self.turn_detection_type
+                "turn_detection": turn_detection_config,
+                "input_audio_noise_reduction": {
+                    "type": "near_field"
                 },
                 "tools": self.tools,
                 "tool_choice": "auto"
@@ -366,7 +374,8 @@ class UnifiedConversationHandler:
                         await self.handle_tool_call(message.name, arguments)
 
                     case "input_audio_buffer.speech_stopped":
-                        logger.error("Detected speech stopped.")
+                        pass
+                        # logger.error("Detected speech stopped.")
                         # await self.reset_silence_timer()
 
                     case "input_audio_buffer.speech_started":
