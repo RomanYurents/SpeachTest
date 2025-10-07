@@ -24,7 +24,7 @@ class NoTurnDetection(ModelWithDefaults):
 
 
 class ServerVAD(ModelWithDefaults):
-    type: Literal["server_vad"] = "server_vad"
+    type: Literal["server_vad", "semantic_vad"] = "server_vad"
     threshold: Optional[Annotated[float, Field(strict=True, ge=0.0, le=1.0)]] = None
     prefix_padding_ms: Optional[int] = None
     silence_duration_ms: Optional[int] = None
@@ -59,6 +59,9 @@ ToolsDefinition = list[Any]
 MaxTokensType = Union[int, Literal["inf"]]
 
 
+class InputAudioNoiseReduction(BaseModel):
+    type: Literal["near_field", "far_field"] = "near_field"
+
 class SessionUpdateParams(BaseModel):
     model: Optional[str] = None
     modalities: Optional[set[Modality]] = None
@@ -67,6 +70,7 @@ class SessionUpdateParams(BaseModel):
     input_audio_format: Optional[AudioFormat] = None
     output_audio_format: Optional[AudioFormat] = None
     input_audio_transcription: Optional[InputAudioTranscription] = None
+    input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
     turn_detection: Optional[TurnDetection] = None
     tools: Optional[ToolsDefinition] = None
     tool_choice: Optional[ToolChoice] = None
@@ -615,7 +619,6 @@ class ItemInputAudioTranscriptionDeltaMessage(ServerMessageBase):
     type: Literal["conversation.item.input_audio_transcription.delta"] = (
         "conversation.item.input_audio_transcription.delta"
     )
-
 
 
 UserMessageType = Annotated[
