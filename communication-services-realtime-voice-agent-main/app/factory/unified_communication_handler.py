@@ -182,6 +182,7 @@ class UnifiedConversationHandler:
                 logger.error("Wait before HANGUP. Ai is speaking...")
                 await asyncio.sleep(0.1)
 
+            await asyncio.sleep(1)  # Brief delay
             await self._hangup()
 
     async def _hangup(self) -> None:
@@ -382,7 +383,6 @@ class UnifiedConversationHandler:
                     case "response.done":
                         self.ai_speaking = False
                         if self.finish_requested:
-                            await asyncio.sleep(2)  # Brief delay
                             await self._hangup()
 
                     case "response.function_call_arguments.done":

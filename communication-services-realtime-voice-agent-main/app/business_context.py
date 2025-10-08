@@ -173,6 +173,19 @@ class DatabaseManager:
                     logger.error(f"No business data returned for phone: {phone}")
                     return None
 
+                categories = data.get("categories", [])
+                items = data.get("catalogItems", [])
+
+                services_list = []
+                for category in categories:
+                    category_items = [
+                        f"{item['title']} (ID: {item['id']}, Price: {item['price']})"
+                        for item in items
+                        if item["categoryId"] == category["id"]
+                    ]
+                    services_list.append(f"{category['name']}: {', '.join(category_items)}")
+                services_str = "\n".join(services_list)
+
                 business_context = BusinessContext(
                     id=data.get("id"),
                     name=data.get("name"),
@@ -184,7 +197,7 @@ class DatabaseManager:
                                                                                          dict) else str(
                         data.get("operatingHours")),
                     phone=data.get("phone"),
-                    services="\n".join(data.get("services", [])),
+                    services=services_str,
                     greeting_message=data.get("greetingMessage"),
                     close_message=data.get("closeMessage"),
                     human_phone=data.get("humanPhone"),
