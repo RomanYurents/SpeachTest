@@ -46,7 +46,7 @@ async def measure_time(label: str):
         yield
     finally:
         end = time.perf_counter()
-        logger.info(f"{label} completed in {end - start:.3f} seconds")
+        logger.error(f"{label} completed in {end - start:.3f} seconds")
 
 
 class UnifiedConversationHandler:
