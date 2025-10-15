@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -19,18 +20,13 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk._logs import LoggingHandler
 from starlette.websockets import WebSocketDisconnect
 from twilio.rest import Client
 
 from app.factory.communication_handler_factory import CommunicationHandlerFactory, CommunicationProvider
 from app.factory.unified_communication_handler import UnifiedConversationHandler
-
-from opentelemetry import trace
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.sdk._logs import LoggingHandler
-from opentelemetry.trace import (
-    get_tracer_provider,
-)
 
 load_dotenv()
 
@@ -40,7 +36,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 app = FastAPI()
 
@@ -52,9 +47,9 @@ if os.getenv("ENV") == "prod" and os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRI
 
     FastAPIInstrumentor.instrument_app(app)
 
-    logger.info("Azure Application Insights tracing enabled")
+    logger.error("Azure Application Insights tracing enabled")
 else:
-    logger.info("Running locally, Azure tracing disabled")
+    logger.error("Running locally, Azure tracing disabled")
 
 # Azure Communication Services setup
 acs_ca_client = CallAutomationClient.from_connection_string(os.getenv("ACS_CONNECTION_STRING"))
