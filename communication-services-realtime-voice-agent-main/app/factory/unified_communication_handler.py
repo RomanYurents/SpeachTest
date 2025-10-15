@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any
@@ -14,6 +15,7 @@ from rtclient import RTLowLevelClient, SessionUpdateMessage, ResponseCreateMessa
 
 from app.business_context import BusinessContextManager
 from app.factory.base_communication_handler import BaseCommunicationHandler
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,17 @@ allowed_languages: List[str] = ['af', 'ar', 'az', 'be', 'bg', 'bs', 'ca', 'cs', 
                                 'zh']
 
 load_dotenv()
+
+
+@asynccontextmanager
+async def measure_time(label: str):
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        end = time.perf_counter()
+        logger.info(f"{label} completed in {end - start:.3f} seconds")
+
 
 class UnifiedConversationHandler:
     """Unified conversation handler that works with any communication provider"""
@@ -97,14 +110,14 @@ class UnifiedConversationHandler:
     async def start_conversation(self) -> None:
         """Start the conversation"""
         try:
-            # Initialize communication handler
-            await self.comm_handler.initialize_call()
+            async with measure_time(f"Call initialization {self.comm_handler.phone_number}"):
+                await self.comm_handler.initialize_call()
 
-            # Initialize business context
-            await self.initialize_business_context()
+            async with measure_time(f"Business context initialization {self.comm_handler.phone_number}"):
+                await self.initialize_business_context()
 
-            # Initialize RT client
-            await self._initialize_rt_client()
+            async with measure_time(f"RT client initialization {self.comm_handler.phone_number}"):
+                await self._initialize_rt_client()
 
             # Start message processing
             asyncio.create_task(self._process_messages())
@@ -204,7 +217,8 @@ class UnifiedConversationHandler:
         """Save order data to server"""
         try:
             # Parse order using GPT (your existing logic)
-            parsed_order = await self._gpt_parse_order()
+            async with measure_time(f"Parsed order"):
+                parsed_order = await self._gpt_parse_order()
 
             # Save to server
             url = f"{os.getenv('AITELL_SERVER_URI')}/orders"
@@ -387,11 +401,11 @@ class UnifiedConversationHandler:
 
                     case "response.function_call_arguments.done":
                         arguments = json.loads(message.arguments)
-                        await self.handle_tool_call(message.name, arguments)
+                        async with measure_time(f"Handle tool call {message.name}"):
+                            await self.handle_tool_call(message.name, arguments)
 
                     case "input_audio_buffer.speech_stopped":
-                        pass
-                        # logger.error("Detected speech stopped.")
+                        logger.error("Detected speech stopped.")
                         # await self.reset_silence_timer()
 
                     case "input_audio_buffer.speech_started":
