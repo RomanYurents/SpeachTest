@@ -65,6 +65,7 @@ class UnifiedConversationHandler:
 
         self.voice = os.getenv("SESSION_VOICE", "cedar")
         self.azure_voice = os.getenv("AZURE_VOICE", "sv-SE-SofieNeural")
+        self.azure_voicelive_model = os.getenv("AZURE_VOICELIVE_MODEL", "gpt-4o-mini-realtime-preview")
         self.voice_rate = os.getenv("AZURE_VOICE_RATE", "1.0")
         self.threshold = float(os.getenv("SESSION_TURN_THRESHOLD", 0.3))
         self.silence_duration = int(os.getenv("SESSION_SILENCE_DURATION_MS", 300))
@@ -190,6 +191,7 @@ class UnifiedConversationHandler:
 
         # Build session update parameters
         session_params = SessionUpdateParams(
+            model=self.azure_voicelive_model,
             modalities={"text", "audio"},
             instructions=self.system_prompt,
             voice=voice_config,
