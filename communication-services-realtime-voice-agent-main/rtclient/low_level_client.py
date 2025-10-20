@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Optional
 
+import aiohttp
 from aiohttp import ClientSession, WSMsgType, WSServerHandshakeError
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
@@ -25,29 +26,37 @@ class ConnectionError(Exception):
 
 class RTLowLevelClient:
     def __init__(
-        self,
-        url: Optional[str] = None,
-        token_credential: Optional[AsyncTokenCredential] = None,
-        key_credential: Optional[AzureKeyCredential] = None,
-        model: Optional[str] = None,
-        azure_deployment: Optional[str] = None,
+            self,
+            url: Optional[str] = None,
+            token_credential: Optional[AsyncTokenCredential] = None,
+            key_credential: Optional[AzureKeyCredential] = None,
+            model: Optional[str] = None,
+            azure_deployment: Optional[str] = None,
+            azure_endpoint: str | None = None,
+            api_version: str | None = None,
+            token: str | None = None,
+            api_key: str | None = None,
     ):
+        self._azure_endpoint = azure_endpoint
+        self._api_version = api_version
+        self._token = token
+        self._api_key = api_key
         self._is_azure_openai = url is not None
-        if self._is_azure_openai:
-            if key_credential is None and token_credential is None:
-                raise ValueError("key_credential or token_credential is required for Azure OpenAI")
-            if azure_deployment is None:
-                raise ValueError("azure_deployment is required for Azure OpenAI")
-        else:
-            if key_credential is None:
-                raise ValueError("key_credential is required for OpenAI")
-            if model is None:
-                raise ValueError("model is required for OpenAI")
+        # if self._is_azure_openai:
+        #     if key_credential is None and token_credential is None:
+        #         raise ValueError("key_credential or token_credential is required for Azure OpenAI")
+        #     if azure_deployment is None:
+        #         raise ValueError("azure_deployment is required for Azure OpenAI")
+        # else:
+        #     if key_credential is None:
+        #         raise ValueError("key_credential is required for OpenAI")
+        #     if model is None:
+        #         raise ValueError("model is required for OpenAI")
 
         self._url = url if self._is_azure_openai else "wss://api.openai.com"
         self._token_credential = token_credential
         self._key_credential = key_credential
-        self._session = ClientSession(base_url=self._url)
+        self._session = ClientSession()
         self._model = model
         self._azure_deployment = azure_deployment
         self.request_id: Optional[uuid.UUID] = None
@@ -72,28 +81,39 @@ class RTLowLevelClient:
         )
 
     async def connect(self):
+        """
+        Connects to Azure Voice Live Realtime WebSocket API.
+        Automatically handles both API key and bearer token auth.
+        """
         try:
-            self.request_id = uuid.uuid4()
-            if self._is_azure_openai:
-                api_version, path = RTLowLevelClient._get_azure_params()
-                auth_headers = await self._get_auth()
-                headers = {
-                    "x-ms-client-request-id": str(self.request_id),
-                    # "User-Agent": get_user_agent(),
-                    **auth_headers,
-                }
-                self.ws = await self._session.ws_connect(
-                    path,
-                    headers=headers,
-                    params={"deployment": self._azure_deployment, "api-version": api_version},
-                )
-            else:
-                headers = {
-                    "Authorization": f"Bearer {self._key_credential.key}",
-                    "openai-beta": "realtime=v1",
-                    # "User-Agent": get_user_agent(),
-                }
-                self.ws = await self._session.ws_connect("/v1/realtime", headers=headers, params={"model": self._model})
+            self.request_id = str(uuid.uuid4())
+
+            azure_ws_endpoint = self._azure_endpoint.rstrip('/').replace("https://", "wss://")
+
+            path = (
+                f"{azure_ws_endpoint}/voice-live/realtime"
+                f"?api-version={self._api_version}&model={self._model}"
+            )
+
+            headers = {
+                "x-ms-client-request-id": self.request_id,
+                "api-key": self._api_key,
+            }
+
+            print(f"🔗 Connecting to Azure Voice Live:\n{path}\n")
+
+            try:
+                self.ws = await self._session.ws_connect(path, headers=headers)
+            except aiohttp.WSServerHandshakeError as e:
+                await self._session.close()
+                print(f"Handshake failed: {e.status} {e.message}")
+                if e.headers:
+                    print("Headers:", e.headers)
+                raise
+            except Exception as e:
+                print("Unexpected WebSocket error:", e)
+                raise
+
         except WSServerHandshakeError as e:
             await self._session.close()
             error_message = f"Received status code {e.status} from the server"
@@ -103,6 +123,10 @@ class RTLowLevelClient:
         message._is_azure = self._is_azure_openai
         message_json = message.model_dump_json(exclude_unset=True)
         await self.ws.send_str(message_json)
+
+    async def send_raw(self, payload: dict):
+        await self.ws.send_str(json.dumps(payload))
+
 
     async def recv(self) -> ServerMessageType | None:
         if self.ws.closed:

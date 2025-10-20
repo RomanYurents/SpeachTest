@@ -30,7 +30,22 @@ class ServerVAD(ModelWithDefaults):
     silence_duration_ms: Optional[int] = None
 
 
-TurnDetection = Annotated[Union[NoTurnDetection, ServerVAD], Field(discriminator="type")]
+class AzureSemanticVAD(ModelWithDefaults):
+    type: Literal["azure_semantic_vad", "azure_semantic_vad_multilingual"] = "azure_semantic_vad"
+    threshold: Optional[Annotated[float, Field(strict=True, ge=0.0, le=1.0)]] = None
+    prefix_padding_ms: Optional[int] = None
+    silence_duration_ms: Optional[int] = None
+    remove_filler_words: Optional[bool] = False
+    end_of_utterance_detection: Optional["EndOfUtteranceDetection"] = None
+
+
+class EndOfUtteranceDetection(ModelWithDefaults):
+    model: Literal["semantic_detection_v1"] = "semantic_detection_v1"
+    threshold: Optional[Annotated[float, Field(strict=True, ge=0.0, le=1.0)]] = 0.01
+    timeout: Optional[int] = 2
+
+
+TurnDetection = Annotated[Union[NoTurnDetection, ServerVAD, AzureSemanticVAD], Field(discriminator="type")]
 
 
 class FunctionToolChoice(ModelWithDefaults):
@@ -46,6 +61,7 @@ MessageRole = Literal["system", "assistant", "user"]
 class InputAudioTranscription(BaseModel):
     model: Literal["whisper-1", "gpt-4o-mini-transcribe", "azure-speech"]
     language: Optional[str] = None
+    phrase_list: Optional[list[str]] = None
 
 
 class ClientMessageBase(ModelWithDefaults):
@@ -60,22 +76,67 @@ MaxTokensType = Union[int, Literal["inf"]]
 
 
 class InputAudioNoiseReduction(BaseModel):
-    type: Literal["near_field", "far_field"] = "near_field"
+    type: Literal["near_field", "far_field", "azure_deep_noise_suppression"] = "near_field"
+
+
+class InputAudioEchoCancellation(BaseModel):
+    type: Literal["server_echo_cancellation"] = "server_echo_cancellation"
+
+
+class AzureVoiceConfig(BaseModel):
+    name: str
+    type: Literal["azure-standard", "azure-custom"]
+    endpoint_id: Optional[str] = None
+    temperature: Optional[Annotated[float, Field(ge=0.0, le=1.0)]] = None
+    custom_lexicon_url: Optional[str] = None
+    rate: Optional[str] = None #0.5-1.5
+
+
+class AnimationConfig(BaseModel):
+    outputs: Optional[list[Literal["viseme_id"]]] = None
+
+
+class AvatarVideoConfig(BaseModel):
+    bitrate: Optional[int] = None
+    codec: Optional[Literal["h264", "vp9"]] = "h264"
+    crop: Optional[dict[str, list[int]]] = None
+    resolution: Optional[dict[str, int]] = None
+    background: Optional[dict[str, str]] = None
+
+
+class ICEServer(BaseModel):
+    urls: list[str]
+    username: Optional[str] = None
+    credential: Optional[str] = None
+
+
+class AvatarConfig(BaseModel):
+    character: str
+    style: str
+    customized: bool = False
+    ice_servers: Optional[list[ICEServer]] = None
+    video: Optional[AvatarVideoConfig] = None
+
 
 class SessionUpdateParams(BaseModel):
     model: Optional[str] = None
     modalities: Optional[set[Modality]] = None
-    voice: Optional[Voice] = None
+    voice: Optional[Union[Voice, AzureVoiceConfig]] = None
     instructions: Optional[str] = None
     input_audio_format: Optional[AudioFormat] = None
     output_audio_format: Optional[AudioFormat] = None
+    input_audio_sampling_rate: Optional[Literal[16000, 24000]] = 24000
     input_audio_transcription: Optional[InputAudioTranscription] = None
     input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
+    input_audio_echo_cancellation: Optional[InputAudioEchoCancellation] = None
     turn_detection: Optional[TurnDetection] = None
     tools: Optional[ToolsDefinition] = None
     tool_choice: Optional[ToolChoice] = None
     temperature: Optional[Temperature] = None
     max_response_output_tokens: Optional[MaxTokensType] = None
+    output_audio_timestamp_types: Optional[list[Literal["word"]]] = None
+    animation: Optional[Union[dict, AnimationConfig]] = None
+    avatar: Optional[Union[dict, AvatarConfig]] = None
 
 
 class SessionUpdateMessage(ClientMessageBase):
@@ -98,6 +159,15 @@ class SessionUpdateMessage(ClientMessageBase):
                 serialized["session"]["turn_detection"] = None
 
         return serialized
+
+
+class SessionAvatarConnectMessage(ClientMessageBase):
+    """
+    Connect avatar with client SDP for video streaming.
+    """
+
+    type: Literal["session.avatar.connect"] = "session.avatar.connect"
+    client_sdp: str
 
 
 class InputAudioBufferAppendMessage(ClientMessageBase):
@@ -225,7 +295,7 @@ class ResponseCreateParams(BaseModel):
     input_items: Optional[list[Item]] = None
     instructions: Optional[str] = None
     modalities: Optional[set[Modality]] = None
-    voice: Optional[Voice] = None
+    voice: Optional[Union[dict, AzureVoiceConfig]] = None
     temperature: Optional[Temperature] = None
     max_output_tokens: Optional[MaxTokensType] = None
     tools: Optional[ToolsDefinition] = None
@@ -268,15 +338,21 @@ class Session(BaseModel):
     model: str
     modalities: set[Modality]
     instructions: str
-    voice: Voice
+    voice: Union[dict, AzureVoiceConfig]
     input_audio_format: AudioFormat
     output_audio_format: AudioFormat
-    input_audio_transcription: Optional[InputAudioTranscription]
-    turn_detection: Optional[TurnDetection]
+    input_audio_sampling_rate: Optional[int] = 24000
+    input_audio_transcription: Optional[Union[dict, InputAudioTranscription]] = None
+    input_audio_noise_reduction: Optional[Union[dict, InputAudioNoiseReduction]] = None
+    input_audio_echo_cancellation: Optional[Union[dict, InputAudioEchoCancellation]] = None
+    turn_detection: Optional[Union[dict, TurnDetection]] = None
     tools: ToolsDefinition
     tool_choice: ToolChoice
     temperature: Temperature
     max_response_output_tokens: Optional[MaxTokensType]
+    output_audio_timestamp_types: Optional[list[Literal["word"]]] = None
+    animation: Optional[Union[dict, AnimationConfig]] = None
+    avatar: Optional[Union[dict, AvatarConfig]] = None
 
 
 class SessionCreatedMessage(ServerMessageBase):
@@ -287,6 +363,15 @@ class SessionCreatedMessage(ServerMessageBase):
 class SessionUpdatedMessage(ServerMessageBase):
     type: Literal["session.updated"] = "session.updated"
     session: Session
+
+
+class SessionAvatarConnectingMessage(ServerMessageBase):
+    """
+    Server responds with SDP for avatar connection.
+    """
+
+    type: Literal["session.avatar.connecting"] = "session.avatar.connecting"
+    server_sdp: str
 
 
 class InputAudioBufferCommittedMessage(ServerMessageBase):
@@ -517,7 +602,7 @@ class ResponseContentPartAddedMessage(ServerMessageBase):
     content_index: int
     part: Annotated[
         ResponseItemContentPart, Field(alias="part", validation_alias=AliasChoices("part", "content"))
-    ]  # TODO: this alias won't be needed when AOAI and OAI are in sync.
+    ]
 
 
 class ResponseContentPartDoneMessage(ServerMessageBase):
@@ -528,7 +613,7 @@ class ResponseContentPartDoneMessage(ServerMessageBase):
     content_index: int
     part: Annotated[
         ResponseItemContentPart, Field(alias="part", validation_alias=AliasChoices("part", "content"))
-    ]  # TODO: this alias won't be needed when AOAI and OAI are in sync.
+    ]
 
 
 class ResponseTextDeltaMessage(ServerMessageBase):
@@ -584,6 +669,56 @@ class ResponseAudioDoneMessage(ServerMessageBase):
     content_index: int
 
 
+class ResponseAudioTimestampDeltaMessage(ServerMessageBase):
+    """
+    Audio timestamp delta for word-level synchronization.
+    """
+
+    type: Literal["response.audio_timestamp.delta"] = "response.audio_timestamp.delta"
+    response_id: str
+    item_id: str
+    output_index: int
+    content_index: int
+    audio_offset_ms: int
+    audio_duration_ms: int
+    text: str
+    timestamp_type: Literal["word"]
+
+
+class ResponseAudioTimestampDoneMessage(ServerMessageBase):
+    """
+    Signals all audio timestamps have been sent.
+    """
+
+    type: Literal["response.audio_timestamp.done"] = "response.audio_timestamp.done"
+    response_id: str
+    item_id: str
+
+
+class ResponseAnimationVisemeDeltaMessage(ServerMessageBase):
+    """
+    Viseme animation data for avatar facial animation.
+    """
+
+    type: Literal["response.animation_viseme.delta"] = "response.animation_viseme.delta"
+    response_id: str
+    item_id: str
+    output_index: int
+    content_index: int
+    audio_offset_ms: int
+    viseme_id: int
+
+
+class ResponseAnimationVisemeDoneMessage(ServerMessageBase):
+    """
+    Signals all viseme messages have been sent.
+    """
+
+    type: Literal["response.animation_viseme.done"] = "response.animation_viseme.done"
+    response_id: str
+    item_id: str
+
+
 class ResponseFunctionCallArgumentsDeltaMessage(ServerMessageBase):
     type: Literal["response.function_call_arguments.delta"] = "response.function_call_arguments.delta"
     response_id: str
@@ -624,6 +759,7 @@ class ItemInputAudioTranscriptionDeltaMessage(ServerMessageBase):
 UserMessageType = Annotated[
     Union[
         SessionUpdateMessage,
+        SessionAvatarConnectMessage,
         InputAudioBufferAppendMessage,
         InputAudioBufferCommitMessage,
         InputAudioBufferClearMessage,
@@ -635,11 +771,13 @@ UserMessageType = Annotated[
     ],
     Field(discriminator="type"),
 ]
+
 ServerMessageType = Annotated[
     Union[
         ErrorMessage,
         SessionCreatedMessage,
         SessionUpdatedMessage,
+        SessionAvatarConnectingMessage,
         InputAudioBufferCommittedMessage,
         InputAudioBufferClearedMessage,
         InputAudioBufferSpeechStartedMessage,
@@ -661,10 +799,14 @@ ServerMessageType = Annotated[
         ResponseAudioTranscriptDoneMessage,
         ResponseAudioDeltaMessage,
         ResponseAudioDoneMessage,
+        ResponseAudioTimestampDeltaMessage,
+        ResponseAudioTimestampDoneMessage,
+        ResponseAnimationVisemeDeltaMessage,
+        ResponseAnimationVisemeDoneMessage,
         ResponseFunctionCallArgumentsDeltaMessage,
         ResponseFunctionCallArgumentsDoneMessage,
         RateLimitsUpdatedMessage,
-        ItemInputAudioTranscriptionDeltaMessage
+        ItemInputAudioTranscriptionDeltaMessage,
     ],
     Field(discriminator="type"),
 ]
@@ -679,6 +821,8 @@ def create_message_from_dict(data: dict) -> ServerMessageType:
             return SessionCreatedMessage(**data)
         case "session.updated":
             return SessionUpdatedMessage(**data)
+        case "session.avatar.connecting":
+            return SessionAvatarConnectingMessage(**data)
         case "input_audio_buffer.committed":
             return InputAudioBufferCommittedMessage(**data)
         case "input_audio_buffer.cleared":
@@ -721,6 +865,14 @@ def create_message_from_dict(data: dict) -> ServerMessageType:
             return ResponseAudioDeltaMessage(**data)
         case "response.audio.done":
             return ResponseAudioDoneMessage(**data)
+        case "response.audio_timestamp.delta":
+            return ResponseAudioTimestampDeltaMessage(**data)
+        case "response.audio_timestamp.done":
+            return ResponseAudioTimestampDoneMessage(**data)
+        case "response.animation_viseme.delta":
+            return ResponseAnimationVisemeDeltaMessage(**data)
+        case "response.animation_viseme.done":
+            return ResponseAnimationVisemeDoneMessage(**data)
         case "response.function_call_arguments.delta":
             return ResponseFunctionCallArgumentsDeltaMessage(**data)
         case "response.function_call_arguments.done":
