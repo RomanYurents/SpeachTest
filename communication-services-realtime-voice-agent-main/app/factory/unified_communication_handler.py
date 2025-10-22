@@ -18,6 +18,17 @@ from app.business_context import BusinessContextManager
 from app.factory.base_communication_handler import BaseCommunicationHandler
 from rtclient import RTLowLevelClient
 
+from rtclient.models import (
+    SessionUpdateMessage,
+    SessionUpdateParams,
+    ResponseCreateMessage,
+    AzureSemanticVAD,
+    InputAudioTranscription,
+    AzureVoiceConfig,
+    InputAudioNoiseReduction,
+    InputAudioEchoCancellation,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -142,17 +153,6 @@ class UnifiedConversationHandler:
 
     async def _initialize_rt_client(self) -> None:
         """Initialize Azure Live API Realtime client"""
-        from rtclient.models import (
-            SessionUpdateMessage,
-            SessionUpdateParams,
-            ResponseCreateMessage,
-            AzureSemanticVAD,
-            InputAudioTranscription,
-            AzureVoiceConfig,
-            InputAudioNoiseReduction,
-            InputAudioEchoCancellation,
-        )
-
         if self.connect_mode == "realtime":
             self.rt_client = RTLowLevelClient(
                 url=self.azure_openai_realtime_endpoint,
@@ -202,7 +202,7 @@ class UnifiedConversationHandler:
         elif self.connect_mode == "voice_live":
             if self.turn_detection_type == 'semantic_vad':
                 self.turn_detection_type = 'azure_semantic_vad'
-            # Build voice configuration
+
             voice_config = AzureVoiceConfig(
                 name=self.azure_voice,
                 type="azure-standard",
@@ -210,37 +210,27 @@ class UnifiedConversationHandler:
                 rate=self.voice_rate,
             )
 
-            # Build input audio transcription
             input_audio_transcription = InputAudioTranscription(
                 model="azure-speech",
                 language=self.business_context.default_ai_language if self.business_context.default_ai_language else "sv",
             )
 
-            # Build input audio noise reduction
             input_audio_noise_reduction = InputAudioNoiseReduction(
                 type="azure_deep_noise_suppression",
             )
 
-            # Build input audio echo cancellation
             input_audio_echo_cancellation = InputAudioEchoCancellation(
                 type="server_echo_cancellation",
             )
 
-            # Build turn detection configuration
             turn_detection = AzureSemanticVAD(
                 type=self.turn_detection_type,
                 threshold=self.threshold or 0.3,
                 prefix_padding_ms=self.prefix_padding or 200,
                 silence_duration_ms=self.silence_duration or 200,
                 remove_filler_words=False,
-                # end_of_utterance_detection=EndOfUtteranceDetection(
-                #     model="semantic_detection_v1",
-                #     threshold=0.01,
-                #     timeout=2,
-                # ),
             )
 
-            # Build session update parameters
             session_params = SessionUpdateParams(
                 model=self.azure_voicelive_model,
                 modalities={"text", "audio"},
