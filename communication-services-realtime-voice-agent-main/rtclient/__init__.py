@@ -90,8 +90,6 @@ from rtclient.models import (
     Session,
     SessionCreatedMessage,
     SessionUpdatedMessage,
-    SessionUpdateMessage,
-    SessionUpdateParams,
     SystemContentPart,
     SystemMessageItem,
     Temperature,
@@ -599,54 +597,54 @@ class RTClient:
             return message
         return None
 
-    async def configure(
-        self,
-        model: Optional[str] = None,
-        modalities: Optional[set[Modality]] = None,
-        voice: Optional[Voice] = None,
-        instructions: Optional[str] = None,
-        input_audio_format: Optional[AudioFormat] = None,
-        output_audio_format: Optional[AudioFormat] = None,
-        input_audio_transcription: Optional[InputAudioTranscription] = None,
-        turn_detection: Optional[TurnDetection] = None,
-        tools: Optional[ToolsDefinition] = None,
-        tool_choice: Optional[ToolChoice] = None,
-        temperature: Optional[Temperature] = None,
-        max_response_output_tokens: Optional[int] = None,
-    ) -> Session:
-        session_update_params = SessionUpdateParams()
-        if model is not None:
-            session_update_params.model = model
-        if modalities is not None:
-            session_update_params.modalities = modalities
-        if voice is not None:
-            session_update_params.voice = voice
-        if instructions is not None:
-            session_update_params.instructions = instructions
-        if input_audio_format is not None:
-            session_update_params.input_audio_format = input_audio_format
-        if output_audio_format is not None:
-            session_update_params.output_audio_format = output_audio_format
-        if input_audio_transcription is not None:
-            session_update_params.input_audio_transcription = input_audio_transcription
-        if turn_detection is not None:
-            session_update_params.turn_detection = turn_detection
-        if tools is not None:
-            session_update_params.tools = tools
-        if tool_choice is not None:
-            session_update_params.tool_choice = tool_choice
-        if temperature is not None:
-            session_update_params.temperature = temperature
-        if max_response_output_tokens is not None:
-            session_update_params.max_response_output_tokens = max_response_output_tokens
-        await self._client.send(SessionUpdateMessage(session=session_update_params))
-
-        message = await self._message_queue.receive(lambda m: m.type == "session.updated")
-        if message.type == "error":
-            raise RealtimeException(message.error)
-        assert message.type == "session.updated"
-        self.session = message.session
-        return message.session
+    # async def configure(
+    #     self,
+    #     model: Optional[str] = None,
+    #     modalities: Optional[set[Modality]] = None,
+    #     voice: Optional[Voice] = None,
+    #     instructions: Optional[str] = None,
+    #     input_audio_format: Optional[AudioFormat] = None,
+    #     output_audio_format: Optional[AudioFormat] = None,
+    #     input_audio_transcription: Optional[InputAudioTranscription] = None,
+    #     turn_detection: Optional[TurnDetection] = None,
+    #     tools: Optional[ToolsDefinition] = None,
+    #     tool_choice: Optional[ToolChoice] = None,
+    #     temperature: Optional[Temperature] = None,
+    #     max_response_output_tokens: Optional[int] = None,
+    # ) -> Session:
+    #     session_update_params = SessionUpdateParams()
+    #     if model is not None:
+    #         session_update_params.model = model
+    #     if modalities is not None:
+    #         session_update_params.modalities = modalities
+    #     if voice is not None:
+    #         session_update_params.voice = voice
+    #     if instructions is not None:
+    #         session_update_params.instructions = instructions
+    #     if input_audio_format is not None:
+    #         session_update_params.input_audio_format = input_audio_format
+    #     if output_audio_format is not None:
+    #         session_update_params.output_audio_format = output_audio_format
+    #     if input_audio_transcription is not None:
+    #         session_update_params.input_audio_transcription = input_audio_transcription
+    #     if turn_detection is not None:
+    #         session_update_params.turn_detection = turn_detection
+    #     if tools is not None:
+    #         session_update_params.tools = tools
+    #     if tool_choice is not None:
+    #         session_update_params.tool_choice = tool_choice
+    #     if temperature is not None:
+    #         session_update_params.temperature = temperature
+    #     if max_response_output_tokens is not None:
+    #         session_update_params.max_response_output_tokens = max_response_output_tokens
+    #     await self._client.send(SessionUpdateMessage(session=session_update_params))
+    #
+    #     message = await self._message_queue.receive(lambda m: m.type == "session.updated")
+    #     if message.type == "error":
+    #         raise RealtimeException(message.error)
+    #     assert message.type == "session.updated"
+    #     self.session = message.session
+    #     return message.session
 
     async def send_audio(self, audio: bytes) -> None:
         base64_encoded = base64.b64encode(audio).decode("utf-8")
@@ -759,8 +757,6 @@ __all__ = [
     "ClientMessageBase",
     "Temperature",
     "ToolsDefinition",
-    "SessionUpdateParams",
-    "SessionUpdateMessage",
     "InputAudioBufferAppendMessage",
     "InputAudioBufferCommitMessage",
     "InputAudioBufferClearMessage",

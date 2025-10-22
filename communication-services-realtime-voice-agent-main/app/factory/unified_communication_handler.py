@@ -16,17 +16,10 @@ from pydantic import BaseModel, Field
 
 from app.business_context import BusinessContextManager
 from app.factory.base_communication_handler import BaseCommunicationHandler
-from rtclient import RTLowLevelClient
-
+from rtclient.base_low_level_client import RealtimeClientFactory
 from rtclient.models import (
-    SessionUpdateMessage,
-    SessionUpdateParams,
     ResponseCreateMessage,
-    AzureSemanticVAD,
-    InputAudioTranscription,
-    AzureVoiceConfig,
-    InputAudioNoiseReduction,
-    InputAudioEchoCancellation,
+    SessionConfigFactory,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,109 +144,186 @@ class UnifiedConversationHandler:
             logger.error(f"Failed to start conversation: {e}")
             await self.comm_handler.end_call()
 
-    async def _initialize_rt_client(self) -> None:
-        """Initialize Azure Live API Realtime client"""
+    async def _initialize_rt_client(self):
         if self.connect_mode == "realtime":
-            self.rt_client = RTLowLevelClient(
-                url=self.azure_openai_realtime_endpoint,
-                key_credential=AzureKeyCredential(self.azure_openai_realtime_service_key),
-                azure_deployment=self.azure_openai_realtime_deployment,
-            )
+            self.rt_client = await self._initialize_openai_realtime()
         elif self.connect_mode == "voice_live":
-            self.rt_client = RTLowLevelClient(
-                azure_endpoint=self.azure_voicelive_endpoint,
-                model=self.azure_voicelive_model,
-                api_version=self.azure_voicelive_version,
-                api_key=self.azure_voicelive_api_key,
-            )
+            self.rt_client = await self._initialize_azure_voice_live()
+        else:
+            raise ValueError(f"Unknown connect_mode: {self.connect_mode}")
 
-        await self.rt_client.connect(mode=self.connect_mode)
+        print(f"Client initialized for mode: {self.connect_mode}")
 
-        if self.connect_mode == "realtime":
-            if self.turn_detection_type == 'azure_semantic_vad':
-                self.turn_detection_type = 'semantic_vad'
-            turn_detection_config = {"type": self.turn_detection_type}
+    async def _initialize_openai_realtime(self):
+        client = RealtimeClientFactory.create_openai_client(
+            url=self.azure_openai_realtime_endpoint,
+            azure_deployment=self.azure_openai_realtime_deployment,
+            key_credential=AzureKeyCredential(
+                self.azure_openai_realtime_service_key
+            ),
+        )
 
-            upd_session = {
-                "type": "session.update",
-                "session": {
-                    "voice": self.voice,
-                    "instructions": self.system_prompt,
-                    "input_audio_format": self.comm_handler.audio_format,
-                    "output_audio_format": self.comm_handler.audio_format,
-                    "input_audio_transcription": {
-                        "model": self.input_audio_transcription_model
-                    },
-                    "turn_detection": turn_detection_config,
-                    "input_audio_noise_reduction": {
-                        "type": "near_field"
-                    },
-                    "tools": self.tools,
-                    "tool_choice": "auto"
-                },
-            }
+        await client.connect()
 
-            if self.business_context and self.business_context.default_ai_language in allowed_languages:
-                upd_session['session']['input_audio_transcription'][
-                    'language'] = self.business_context.default_ai_language
+        turn_detection_type = self.turn_detection_type
 
-            await self.rt_client.send_raw(upd_session)
+        if turn_detection_type == 'azure_semantic_vad':
+            turn_detection_type = 'server_vad'
 
-        elif self.connect_mode == "voice_live":
-            if self.turn_detection_type == 'semantic_vad':
-                self.turn_detection_type = 'azure_semantic_vad'
+        session_config = SessionConfigFactory.create_openai_config(
+            voice=self.voice,
+            system_prompt=self.system_prompt,
+            audio_format=self.comm_handler.audio_format,
+            turn_detection_type=turn_detection_type,
+            transcription_model=self.input_audio_transcription_model,
+            language=self.business_context.default_ai_language,
+            tools=self.tools,
+        )
 
-            voice_config = AzureVoiceConfig(
-                name=self.azure_voice,
-                type="azure-standard",
-                temperature=0.8,
-                rate=self.voice_rate,
-            )
+        await client.send(session_config)
 
-            input_audio_transcription = InputAudioTranscription(
-                model="azure-speech",
-                language=self.business_context.default_ai_language if self.business_context.default_ai_language else "sv",
-            )
+        await client.send(ResponseCreateMessage())
 
-            input_audio_noise_reduction = InputAudioNoiseReduction(
-                type="azure_deep_noise_suppression",
-            )
+        return client
 
-            input_audio_echo_cancellation = InputAudioEchoCancellation(
-                type="server_echo_cancellation",
-            )
+    async def _initialize_azure_voice_live(self):
+        client = RealtimeClientFactory.create_azure_voice_live_client(
+            azure_endpoint=self.azure_voicelive_endpoint,
+            model=self.azure_voicelive_model,
+            api_version=self.azure_voicelive_version,
+            api_key=self.azure_voicelive_api_key,
+        )
 
-            turn_detection = AzureSemanticVAD(
-                type=self.turn_detection_type,
-                threshold=self.threshold or 0.3,
-                prefix_padding_ms=self.prefix_padding or 200,
-                silence_duration_ms=self.silence_duration or 200,
-                remove_filler_words=False,
-            )
+        await client.connect()
 
-            session_params = SessionUpdateParams(
-                model=self.azure_voicelive_model,
-                modalities={"text", "audio"},
-                instructions=self.system_prompt,
-                voice=voice_config,
-                turn_detection=turn_detection,
-                input_audio_transcription=input_audio_transcription,
-                input_audio_noise_reduction=input_audio_noise_reduction,
-                input_audio_echo_cancellation=input_audio_echo_cancellation,
-                input_audio_sampling_rate=self.comm_handler.voice_live_rate,
-                input_audio_format="pcm16", #Always pcm16 for VoIP
-                output_audio_format=self.comm_handler.audio_format,
-                temperature=0.7,
-                tools=self.tools if hasattr(self, 'tools') else [],
-                tool_choice="auto",
-            )
+        turn_detection_type = self.turn_detection_type
 
-            session_update_msg = SessionUpdateMessage(session=session_params)
-            await self.rt_client.send(session_update_msg)
+        if turn_detection_type == 'semantic_vad':
+            turn_detection_type = 'azure_semantic_vad'
 
-        await self.rt_client.send(ResponseCreateMessage())
+        session_config = SessionConfigFactory.create_azure_voice_live_config(
+            azure_voice=self.azure_voice,
+            system_prompt=self.system_prompt,
+            audio_format=self.comm_handler.audio_format,
+            turn_detection_type=turn_detection_type,
+            language=self.business_context.default_ai_language,
+            voice_rate=self.voice_rate,
+            threshold=self.threshold,
+            prefix_padding=self.prefix_padding,
+            silence_duration=self.silence_duration,
+            tools=self.tools,
+            model=self.azure_voicelive_model,
+        )
 
-        logger.info("Azure Live API Realtime client initialized successfully")
+        await client.send(session_config)
+
+        await client.send(ResponseCreateMessage())
+
+        return client
+
+    # async def _initialize_rt_client(self) -> None:
+    #     """Initialize Azure Live API Realtime client"""
+    #     if self.connect_mode == "realtime":
+    #         self.rt_client = RTLowLevelClient(
+    #             url=self.azure_openai_realtime_endpoint,
+    #             key_credential=AzureKeyCredential(self.azure_openai_realtime_service_key),
+    #             azure_deployment=self.azure_openai_realtime_deployment,
+    #         )
+    #     elif self.connect_mode == "voice_live":
+    #         self.rt_client = RTLowLevelClient(
+    #             azure_endpoint=self.azure_voicelive_endpoint,
+    #             model=self.azure_voicelive_model,
+    #             api_version=self.azure_voicelive_version,
+    #             api_key=self.azure_voicelive_api_key,
+    #         )
+    #
+    #     await self.rt_client.connect(mode=self.connect_mode)
+    #
+    #     if self.connect_mode == "realtime":
+    #         if self.turn_detection_type == 'azure_semantic_vad':
+    #             self.turn_detection_type = 'semantic_vad'
+    #         turn_detection_config = {"type": self.turn_detection_type}
+    #
+    #         upd_session = {
+    #             "type": "session.update",
+    #             "session": {
+    #                 "voice": self.voice,
+    #                 "instructions": self.system_prompt,
+    #                 "input_audio_format": self.comm_handler.audio_format,
+    #                 "output_audio_format": self.comm_handler.audio_format,
+    #                 "input_audio_transcription": {
+    #                     "model": self.input_audio_transcription_model
+    #                 },
+    #                 "turn_detection": turn_detection_config,
+    #                 "input_audio_noise_reduction": {
+    #                     "type": "near_field"
+    #                 },
+    #                 "tools": self.tools,
+    #                 "tool_choice": "auto"
+    #             },
+    #         }
+    #
+    #         if self.business_context and self.business_context.default_ai_language in allowed_languages:
+    #             upd_session['session']['input_audio_transcription'][
+    #                 'language'] = self.business_context.default_ai_language
+    #
+    #         await self.rt_client.send_raw(upd_session)
+    #
+    #     elif self.connect_mode == "voice_live":
+    #         if self.turn_detection_type == 'semantic_vad':
+    #             self.turn_detection_type = 'azure_semantic_vad'
+    #
+    #         voice_config = AzureVoiceConfig(
+    #             name=self.azure_voice,
+    #             type="azure-standard",
+    #             temperature=0.8,
+    #             rate=self.voice_rate,
+    #         )
+    #
+    #         input_audio_transcription = InputAudioTranscription(
+    #             model="azure-speech",
+    #             language=self.business_context.default_ai_language if self.business_context.default_ai_language else "sv",
+    #         )
+    #
+    #         input_audio_noise_reduction = InputAudioNoiseReduction(
+    #             type="azure_deep_noise_suppression",
+    #         )
+    #
+    #         input_audio_echo_cancellation = InputAudioEchoCancellation(
+    #             type="server_echo_cancellation",
+    #         )
+    #
+    #         turn_detection = AzureSemanticVAD(
+    #             type=self.turn_detection_type,
+    #             threshold=self.threshold or 0.3,
+    #             prefix_padding_ms=self.prefix_padding or 200,
+    #             silence_duration_ms=self.silence_duration or 200,
+    #             remove_filler_words=False,
+    #         )
+    #
+    #         session_params = SessionUpdateParams(
+    #             model=self.azure_voicelive_model,
+    #             modalities={"text", "audio"},
+    #             instructions=self.system_prompt,
+    #             voice=voice_config,
+    #             turn_detection=turn_detection,
+    #             input_audio_transcription=input_audio_transcription,
+    #             input_audio_noise_reduction=input_audio_noise_reduction,
+    #             input_audio_echo_cancellation=input_audio_echo_cancellation,
+    #             input_audio_sampling_rate=24000,
+    #             input_audio_format=self.comm_handler.audio_format,
+    #             output_audio_format=self.comm_handler.audio_format,
+    #             temperature=0.7,
+    #             tools=self.tools if hasattr(self, 'tools') else [],
+    #             tool_choice="auto",
+    #         )
+    #
+    #         session_update_msg = SessionUpdateMessage(session=session_params)
+    #         await self.rt_client.send(session_update_msg)
+    #
+    #     await self.rt_client.send(ResponseCreateMessage())
+    #
+    #     logger.info("Azure Live API Realtime client initialized successfully")
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Handle tool calls"""

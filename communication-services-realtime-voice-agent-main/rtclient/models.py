@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-
+from abc import ABC
 from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
@@ -118,47 +118,140 @@ class AvatarConfig(BaseModel):
     video: Optional[AvatarVideoConfig] = None
 
 
-class SessionUpdateParams(BaseModel):
+class BaseSessionUpdateParams(BaseModel, ABC):
     model: Optional[str] = None
     modalities: Optional[set[Modality]] = None
-    voice: Optional[Union[Voice, AzureVoiceConfig]] = None
     instructions: Optional[str] = None
     input_audio_format: Optional[AudioFormat] = None
     output_audio_format: Optional[AudioFormat] = None
-    input_audio_sampling_rate: Optional[Literal[16000, 24000]] = 24000
-    input_audio_transcription: Optional[InputAudioTranscription] = None
-    input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
-    input_audio_echo_cancellation: Optional[InputAudioEchoCancellation] = None
-    turn_detection: Optional[TurnDetection] = None
-    tools: Optional[ToolsDefinition] = None
-    tool_choice: Optional[ToolChoice] = None
     temperature: Optional[Temperature] = None
     max_response_output_tokens: Optional[MaxTokensType] = None
+    tools: Optional[list[Any]] = None
+    tool_choice: Optional[Any] = None
+
+
+class BaseTranscription(BaseModel, ABC):
+    model: str
+    language: Optional[str] = None
+
+
+class OpenAITranscription(BaseTranscription):
+    model: Literal["whisper-1", "gpt-4o-mini-transcribe"]
+
+
+class AzureTranscription(BaseTranscription):
+    model: Literal["azure-speech"]
+    phrase_list: Optional[list[str]] = None
+
+
+class OpenAISessionUpdateParams(BaseSessionUpdateParams):
+    voice: Optional[Voice] = None
+    input_audio_transcription: Optional[OpenAITranscription] = None
+    input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
+    turn_detection: Optional[Union[NoTurnDetection, ServerVAD]] = None
+
+
+class AzureVoiceLiveSessionUpdateParams(BaseSessionUpdateParams):
+    voice: Optional[AzureVoiceConfig] = None
+    input_audio_transcription: Optional[AzureTranscription] = None
+    input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
+    input_audio_echo_cancellation: Optional[InputAudioEchoCancellation] = None
+    input_audio_sampling_rate: Optional[Literal[16000, 24000]] = 24000
+    turn_detection: Optional[Union[NoTurnDetection, AzureSemanticVAD]] = None
     output_audio_timestamp_types: Optional[list[Literal["word"]]] = None
-    animation: Optional[Union[dict, AnimationConfig]] = None
-    avatar: Optional[Union[dict, AvatarConfig]] = None
+    # Avatar та інші Azure-специфічні поля
+    animation: Optional[dict] = None
+    avatar: Optional[dict] = None
 
 
-class SessionUpdateMessage(ClientMessageBase):
-    """
-    Update the session configuration.
-    """
+class SessionConfigFactory:
+    @staticmethod
+    def create_openai_config(
+            voice: Voice = "alloy",
+            system_prompt: str = "",
+            audio_format: AudioFormat = "pcm16",
+            turn_detection_type: Literal["server_vad", "none"] = "server_vad",
+            transcription_model: Literal["whisper-1", "gpt-4o-mini-transcribe"] = "whisper-1",
+            language: Optional[str] = None,
+            tools: Optional[list[Any]] = None,
+    ) -> OpenAISessionUpdateParams:
+        if turn_detection_type == "none":
+            turn_detection = NoTurnDetection()
+        else:
+            turn_detection = ServerVAD(type="server_vad")
 
-    type: Literal["session.update"] = "session.update"
-    session: SessionUpdateParams
+        transcription = OpenAITranscription(
+            model=transcription_model,
+            language=language
+        )
 
-    @model_serializer(mode="wrap")
-    def _azure_compatibility(self, next: SerializerFunctionWrapHandler, info: SerializationInfo):
-        serialized = next(self)
-        if not self._is_azure:
-            if (
-                    self.session is not None
-                    and self.session.turn_detection is not None
-                    and self.session.turn_detection.type == "none"
-            ):
-                serialized["session"]["turn_detection"] = None
+        return OpenAISessionUpdateParams(
+            voice=voice,
+            instructions=system_prompt,
+            input_audio_format=audio_format,
+            output_audio_format=audio_format,
+            input_audio_transcription=transcription,
+            turn_detection=turn_detection,
+            input_audio_noise_reduction=InputAudioNoiseReduction(type="near_field"),
+            tools=tools or [],
+            tool_choice="auto",
+        )
 
-        return serialized
+    @staticmethod
+    def create_azure_voice_live_config(
+            azure_voice: str,
+            system_prompt: str = "",
+            audio_format: AudioFormat = "pcm16",
+            turn_detection_type: Literal[
+                "azure_semantic_vad", "azure_semantic_vad_multilingual"] = "azure_semantic_vad",
+            language: str = "sv",
+            voice_rate: str = "1.0",
+            threshold: float = 0.3,
+            prefix_padding: int = 200,
+            silence_duration: int = 200,
+            tools: Optional[list[Any]] = None,
+            model: str = "gpt-4o-realtime-preview",
+    ) -> AzureVoiceLiveSessionUpdateParams:
+        voice_config = AzureVoiceConfig(
+            name=azure_voice,
+            type="azure-standard",
+            temperature=0.8,
+            rate=voice_rate,
+        )
+
+        transcription = AzureTranscription(
+            model="azure-speech",
+            language=language,
+        )
+
+        turn_detection = AzureSemanticVAD(
+            type=turn_detection_type,
+            threshold=threshold,
+            prefix_padding_ms=prefix_padding,
+            silence_duration_ms=silence_duration,
+            remove_filler_words=False,
+        )
+
+        return AzureVoiceLiveSessionUpdateParams(
+            model=model,
+            modalities={"text", "audio"},
+            instructions=system_prompt,
+            voice=voice_config,
+            turn_detection=turn_detection,
+            input_audio_transcription=transcription,
+            input_audio_noise_reduction=InputAudioNoiseReduction(
+                type="azure_deep_noise_suppression"
+            ),
+            input_audio_echo_cancellation=InputAudioEchoCancellation(
+                type="server_echo_cancellation"
+            ),
+            input_audio_sampling_rate=24000,
+            input_audio_format=audio_format,
+            output_audio_format=audio_format,
+            temperature=0.7,
+            tools=tools or [],
+            tool_choice="auto",
+        )
 
 
 class SessionAvatarConnectMessage(ClientMessageBase):
@@ -758,7 +851,7 @@ class ItemInputAudioTranscriptionDeltaMessage(ServerMessageBase):
 
 UserMessageType = Annotated[
     Union[
-        SessionUpdateMessage,
+        SessionUpdatedMessage,
         SessionAvatarConnectMessage,
         InputAudioBufferAppendMessage,
         InputAudioBufferCommitMessage,
