@@ -338,7 +338,7 @@ class Session(BaseModel):
     model: str
     modalities: set[Modality]
     instructions: str
-    voice: Union[dict, AzureVoiceConfig]
+    voice: Union[str, AzureVoiceConfig]
     input_audio_format: AudioFormat
     output_audio_format: AudioFormat
     input_audio_sampling_rate: Optional[int] = 24000
