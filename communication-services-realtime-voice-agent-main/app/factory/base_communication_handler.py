@@ -31,6 +31,7 @@ class BaseCommunicationHandler(ABC):
         self.end_time: Optional[datetime] = None
         self.is_closed = False
         self.audio_format = None
+        self.voice_live_rate = 16_000
 
     @abstractmethod
     async def initialize_call(self) -> bool:

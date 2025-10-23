@@ -24,6 +24,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
         self.call_connection_id = call_connection_id
         self.audio_format = "pcm16"
         self.is_closed = False
+        self.voice_live_rate = 24_000
 
     async def initialize_call(self) -> bool:
         """Initialize Azure call connection"""

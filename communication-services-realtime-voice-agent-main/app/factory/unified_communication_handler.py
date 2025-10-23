@@ -240,8 +240,8 @@ class UnifiedConversationHandler:
                 input_audio_transcription=input_audio_transcription,
                 input_audio_noise_reduction=input_audio_noise_reduction,
                 input_audio_echo_cancellation=input_audio_echo_cancellation,
-                input_audio_sampling_rate=24000,
-                input_audio_format=self.comm_handler.audio_format,
+                input_audio_sampling_rate=self.comm_handler.voice_live_rate,
+                input_audio_format="pcm16", #Always pcm16 for VoIP
                 output_audio_format=self.comm_handler.audio_format,
                 temperature=0.7,
                 tools=self.tools if hasattr(self, 'tools') else [],
