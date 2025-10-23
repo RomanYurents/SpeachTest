@@ -19,7 +19,7 @@ from app.factory.base_communication_handler import BaseCommunicationHandler
 from rtclient.base_low_level_client import RealtimeClientFactory
 from rtclient.models import (
     ResponseCreateMessage,
-    SessionConfigFactory,
+    SessionConfigFactory, SessionUpdateMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -215,7 +215,7 @@ class UnifiedConversationHandler:
             model=self.azure_voicelive_model,
         )
 
-        await client.send(session_config)
+        await client.send(SessionUpdateMessage(session=session_config))
 
         await client.send(ResponseCreateMessage())
 

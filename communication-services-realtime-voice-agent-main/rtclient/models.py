@@ -89,7 +89,7 @@ class AzureVoiceConfig(BaseModel):
     endpoint_id: Optional[str] = None
     temperature: Optional[Annotated[float, Field(ge=0.0, le=1.0)]] = None
     custom_lexicon_url: Optional[str] = None
-    rate: Optional[str] = None #0.5-1.5
+    rate: Optional[str] = None  # 0.5-1.5
 
 
 class AnimationConfig(BaseModel):
@@ -152,6 +152,7 @@ class OpenAISessionUpdateParams(BaseSessionUpdateParams):
 
 
 class AzureVoiceLiveSessionUpdateParams(BaseSessionUpdateParams):
+    type: Literal["session.update"] = "session.update"
     voice: Optional[AzureVoiceConfig] = None
     input_audio_transcription: Optional[AzureTranscription] = None
     input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
@@ -388,7 +389,7 @@ class ResponseCreateParams(BaseModel):
     input_items: Optional[list[Item]] = None
     instructions: Optional[str] = None
     modalities: Optional[set[Modality]] = None
-    voice: Optional[Union[dict, AzureVoiceConfig]] = None
+    voice: Optional[Any] = None
     temperature: Optional[Temperature] = None
     max_output_tokens: Optional[MaxTokensType] = None
     tools: Optional[ToolsDefinition] = None
@@ -431,7 +432,7 @@ class Session(BaseModel):
     model: str
     modalities: set[Modality]
     instructions: str
-    voice: Union[dict, AzureVoiceConfig]
+    voice: Optional[Any] = None
     input_audio_format: AudioFormat
     output_audio_format: AudioFormat
     input_audio_sampling_rate: Optional[int] = 24000
@@ -446,6 +447,24 @@ class Session(BaseModel):
     output_audio_timestamp_types: Optional[list[Literal["word"]]] = None
     animation: Optional[Union[dict, AnimationConfig]] = None
     avatar: Optional[Union[dict, AvatarConfig]] = None
+
+
+SessionUpdateParamsType = Union[OpenAISessionUpdateParams, AzureVoiceLiveSessionUpdateParams]
+
+
+class SessionUpdateMessage(ClientMessageBase):
+    """
+    Update the session configuration.
+    """
+
+    type: Literal["session.update"] = "session.update"
+    session: SessionUpdateParamsType
+
+    @model_serializer(mode="wrap")
+    def _azure_compatibility(self, next: SerializerFunctionWrapHandler, info: SerializationInfo):
+        serialized = next(self)
+
+        return serialized
 
 
 class SessionCreatedMessage(ServerMessageBase):
