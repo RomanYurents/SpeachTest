@@ -245,7 +245,7 @@ async def azure_websocket_handler(websocket: WebSocket):
                 data = await websocket.receive_json()
                 if data.get("kind") == "AudioData":
                     audio_data = data["audioData"]["data"]
-                    await conversation_handler.send_audio_async(audio_data)
+                    await conversation_handler.send_audio_async(audio_data, mode=conversation_handler.connect_mode)
             except Exception as e:
                 logger.error(f"Azure WebSocket error: {e}")
                 break
@@ -335,7 +335,7 @@ async def twilio_media_stream_handler(websocket: WebSocket):
 
             elif data.get("event") == "media" and conversation_handler:
                 audio_data = data["media"]["payload"]
-                await conversation_handler.send_audio_async(audio_data)
+                await conversation_handler.send_audio_async(audio_data, mode=conversation_handler.connect_mode)
 
             elif data.get("event") == "stop":
                 logger.error(f"Twilio call stopped: {call_connection_id}")

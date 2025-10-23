@@ -10,7 +10,7 @@ from typing import Literal, Optional, TypeGuard, Union
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
 
-from rtclient.low_level_client import RTLowLevelClient
+from rtclient.fabric_low_level_client import RTLowLevelClient
 from rtclient.models import (
     AssistantContentPart,
     AssistantMessageItem,

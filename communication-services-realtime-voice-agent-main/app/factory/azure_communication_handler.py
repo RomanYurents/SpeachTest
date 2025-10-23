@@ -86,7 +86,7 @@ class AzureCommunicationHandler(BaseCommunicationHandler):
         except Exception as e:
             logger.error(f"Error sending Azure audio: {e}")
 
-    async def send_audio_async(self, rt_client, audio_data: str) -> None:
+    async def send_audio_async(self, rt_client, audio_data: str, mode: str = "voice_live") -> None:
         await rt_client.send(
             message=InputAudioBufferAppendMessage(
                 type="input_audio_buffer.append", audio=audio_data, _is_azure=True

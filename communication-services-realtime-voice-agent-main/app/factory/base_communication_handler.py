@@ -49,13 +49,13 @@ class BaseCommunicationHandler(ABC):
         pass
 
     @abstractmethod
-    async def send_audio_async(self, rt_client, audio_data: str) -> None:
+    async def send_audio_async(self, rt_client, audio_data: str, mode: str = "voice_live") -> None:
         """Send audio data to the call"""
         pass
 
     @abstractmethod
     async def receive_audio(self, data_payload) -> None:
-       pass
+        pass
 
     @abstractmethod
     async def stop_audio(self) -> None:

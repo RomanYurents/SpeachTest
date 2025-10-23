@@ -138,8 +138,9 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
 
         return base64.b64encode(pcm16.tobytes()).decode("utf-8")
 
-    async def send_audio_async(self, rt_client, audio_data: str) -> None:
-        audio_pcm16 = self.twilio_ulaw_to_azure_pcm16(base64.b64decode(audio_data))
+    async def send_audio_async(self, rt_client, audio_data: str, mode: str = "voice_live") -> None:
+        audio_pcm16 = self.twilio_ulaw_to_azure_pcm16(
+            base64.b64decode(audio_data)) if mode == "voice_live" else audio_data
         await rt_client.send(
             message=InputAudioBufferAppendMessage(
                 type="input_audio_buffer.append", audio=audio_pcm16, _is_azure=True

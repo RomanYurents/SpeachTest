@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.business_context import BusinessContextManager
 from app.factory.base_communication_handler import BaseCommunicationHandler
-from rtclient.base_low_level_client import RealtimeClientFactory
+from rtclient.fabric_low_level_client import RealtimeClientFactory
 from rtclient.models import (
     ResponseCreateMessage,
     SessionConfigFactory, SessionUpdateMessage,
@@ -485,8 +485,8 @@ class UnifiedConversationHandler:
         except Exception as e:
             logger.error(f"Error processing messages: {e}")
 
-    async def send_audio_async(self, audio_data: str) -> None:
-        await self.comm_handler.send_audio_async(self.rt_client, audio_data)
+    async def send_audio_async(self, audio_data: str, mode="voice_live") -> None:
+        await self.comm_handler.send_audio_async(self.rt_client, audio_data, mode=mode)
 
 # Usage examples:
 
