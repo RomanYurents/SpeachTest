@@ -15,7 +15,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
 MU_LAW_DECODE_TABLE = np.array([
     -32124, -31100, -30076, -29052, -28028, -27004, -25980, -24956,
     -23932, -22908, -21884, -20860, -19836, -18812, -17788, -16764,
@@ -65,7 +64,7 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
         self.call_sid = call_sid
         self.audio_format = "g711_ulaw"
         self.is_closed = False
-        self.voice_live_rate = 16_000 #Because of VoIP
+        self.voice_live_rate = 16_000  # Because of VoIP
 
     async def initialize_call(self) -> bool:
         """Initialize Twilio call connection"""
@@ -177,4 +176,3 @@ class TwilioCommunicationHandler(BaseCommunicationHandler):
             logger.info(f"Stopped audio for Twilio stream {self.stream_sid}")
         except Exception as e:
             logger.error(f"Error stopping Twilio audio: {e}")
-

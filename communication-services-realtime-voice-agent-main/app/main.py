@@ -212,18 +212,13 @@ async def azure_websocket_handler(websocket: WebSocket):
     """Azure Communication Services WebSocket handler"""
     await websocket.accept()
 
-    # context_id = websocket.query_params.get("contextId")
-    # if not context_id or context_id not in context_store:
-    #     logger.error(f"Invalid or missing contextId: {context_id}")
-    #     await websocket.close(code=1000, reason="Invalid context")
-    #     return
+    context_id = websocket.query_params.get("contextId")
+    if not context_id or context_id not in context_store:
+        logger.error(f"Invalid or missing contextId: {context_id}")
+        await websocket.close(code=1000, reason="Invalid context")
+        return
 
-    # call_info = context_store[context_id]
-    call_info = {
-        "callee_id": "+4570715810",
-        "caller_id": "+46197675010",
-        "call_connection_id": "test",
-    }
+    call_info = context_store[context_id]
     caller_id = call_info.get("caller_id")
     callee_id = call_info.get("callee_id")
     call_connection_id = call_info.get("call_connection_id")
@@ -443,12 +438,12 @@ async def transfer_conversation(call_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main:app",
-        host="localhost",
-        port=int(os.getenv("PORT", 8001)),
-        reload=True
-    )
+# if __name__ == "__main__":
+#     import uvicorn
+#
+#     uvicorn.run(
+#         "app.main:app",
+#         host="localhost",
+#         port=int(os.getenv("PORT", 8001)),
+#         reload=True
+#     )

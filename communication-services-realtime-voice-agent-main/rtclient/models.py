@@ -145,6 +145,7 @@ class AzureTranscription(BaseTranscription):
 
 
 class OpenAISessionUpdateParams(BaseSessionUpdateParams):
+    type: Literal["session.update"] = "session.update"
     voice: Optional[Voice] = None
     input_audio_transcription: Optional[OpenAITranscription] = None
     input_audio_noise_reduction: Optional[InputAudioNoiseReduction] = None
@@ -202,7 +203,9 @@ class SessionConfigFactory:
     def create_azure_voice_live_config(
             azure_voice: str,
             system_prompt: str = "",
-            audio_format: AudioFormat = "pcm16",
+            input_audio_format: AudioFormat = "pcm16",
+            output_audio_format: AudioFormat = "pcm16",
+            input_audio_sampling_rate=16_000,
             turn_detection_type: Literal[
                 "azure_semantic_vad", "azure_semantic_vad_multilingual"] = "azure_semantic_vad",
             language: str = "sv",
@@ -246,9 +249,9 @@ class SessionConfigFactory:
             input_audio_echo_cancellation=InputAudioEchoCancellation(
                 type="server_echo_cancellation"
             ),
-            input_audio_sampling_rate=24000,
-            input_audio_format=audio_format,
-            output_audio_format=audio_format,
+            input_audio_sampling_rate=input_audio_sampling_rate,
+            input_audio_format=input_audio_format,
+            output_audio_format=output_audio_format,
             temperature=0.7,
             tools=tools or [],
             tool_choice="auto",
