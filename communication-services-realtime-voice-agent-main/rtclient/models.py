@@ -136,7 +136,7 @@ class BaseTranscription(BaseModel, ABC):
 
 
 class OpenAITranscription(BaseTranscription):
-    model: Literal["whisper-1", "gpt-4o-mini-transcribe"]
+    model: Literal["whisper-1", "gpt-4o-mini-transcribe", "azure-speech"]
 
 
 class AzureTranscription(BaseTranscription):
