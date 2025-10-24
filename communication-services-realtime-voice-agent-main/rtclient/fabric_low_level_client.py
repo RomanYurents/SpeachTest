@@ -1,10 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""
-Рефакторинг клієнта з використанням фабрики для різних API
-"""
-
 import json
 import uuid
 from abc import ABC, abstractmethod
@@ -81,8 +77,6 @@ class BaseRealtimeClient(ABC):
 
 
 class OpenAIRealtimeClient(BaseRealtimeClient):
-    """Клієнт для Azure OpenAI Realtime API"""
-
     def __init__(
             self,
             url: str,
@@ -249,7 +243,6 @@ class RTLowLevelClient:
             )
 
     async def connect(self, mode: Optional[str] = None):
-        """Підключення (mode ігнорується, використовується auto-detection)"""
         await self._client.connect()
 
     async def send(self, message: UserMessageType):

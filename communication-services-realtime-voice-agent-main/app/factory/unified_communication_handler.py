@@ -487,29 +487,3 @@ class UnifiedConversationHandler:
 
     async def send_audio_async(self, audio_data: str, mode="voice_live") -> None:
         await self.comm_handler.send_audio_async(self.rt_client, audio_data, mode=mode)
-
-# Usage examples:
-
-# For Azure:
-# azure_handler = CommunicationHandlerFactory.create_handler(
-#     CommunicationProvider.AZURE,
-#     websocket=websocket,
-#     call_connection_id=call_connection_id,
-#     acs_client=acs_client,
-#     phone_number=phone_number,
-#     customer_phone=customer_phone
-# )
-# conversation_handler = UnifiedConversationHandler(azure_handler)
-# await conversation_handler.start_conversation()
-
-# For Twilio:
-# twilio_handler = CommunicationHandlerFactory.create_handler(
-#     CommunicationProvider.TWILIO,
-#     websocket=websocket,
-#     stream_sid=stream_sid,
-#     twilio_client=twilio_client,
-#     phone_number=phone_number,
-#     customer_phone=customer_phone
-# )
-# conversation_handler = UnifiedConversationHandler(twilio_handler)
-# await conversation_handler.start_conversation()

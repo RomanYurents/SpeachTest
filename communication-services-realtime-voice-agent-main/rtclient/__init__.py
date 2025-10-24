@@ -136,11 +136,11 @@ class RealtimeException(Exception):
 
 class RTInputAudioItem:
     def __init__(
-        self,
-        id: str,
-        audio_start_ms: Optional[int],
-        has_transcription: bool,
-        queue: MessageQueueWithError[ServerMessageType],
+            self,
+            id: str,
+            audio_start_ms: Optional[int],
+            has_transcription: bool,
+            queue: MessageQueueWithError[ServerMessageType],
     ):
         self.type: Literal["input_audio"] = "input_audio"
         self.id = id
@@ -155,15 +155,15 @@ class RTInputAudioItem:
             while True:
                 message = await self.__queue.receive(
                     lambda m: (
-                        m.type
-                        in [
-                            "input_audio_buffer.speech_stopped",
-                            "conversation.item.input_audio_transcription.completed",
-                            "conversation.item.input_audio_transcription.failed",
-                        ]
-                        and m.item_id == self.id
-                    )
-                    or (m.type == "conversation.item.created" and m.item.id == self.id)
+                                      m.type
+                                      in [
+                                          "input_audio_buffer.speech_stopped",
+                                          "conversation.item.input_audio_transcription.completed",
+                                          "conversation.item.input_audio_transcription.failed",
+                                      ]
+                                      and m.item_id == self.id
+                              )
+                              or (m.type == "conversation.item.created" and m.item.id == self.id)
                 )
                 if message is None:
                     return
@@ -186,10 +186,10 @@ class RTInputAudioItem:
 
 class SharedEndQueue:
     def __init__(
-        self,
-        receive_delegate: Callable[[], Awaitable[ServerMessageType]],
-        error_predicate: Callable[[ServerMessageType], bool],
-        end_predicate: Callable[[ServerMessageType], bool],
+            self,
+            receive_delegate: Callable[[], Awaitable[ServerMessageType]],
+            error_predicate: Callable[[ServerMessageType], bool],
+            end_predicate: Callable[[ServerMessageType], bool],
     ):
         self._receive_delegate = receive_delegate
         self._error_predicate = error_predicate
@@ -231,7 +231,7 @@ class RTAudioContent:
 
     async def _receive_content(self):
         def is_valid_message(
-            m: ServerMessageType,
+                m: ServerMessageType,
         ) -> TypeGuard[
             Union[
                 ResponseAudioDeltaMessage,
@@ -318,7 +318,7 @@ class RTTextContent:
 
     async def _receive_content(self):
         def is_valid_message(
-            m: ServerMessageType,
+                m: ServerMessageType,
         ) -> TypeGuard[
             Union[
                 ResponseTextDeltaMessage,
@@ -374,11 +374,11 @@ RTMessageContent = Union[RTAudioContent, RTTextContent]
 
 class RTMessageItem:
     def __init__(
-        self,
-        response_id: str,
-        item: ResponseItem,
-        previous_id: Optional[str],
-        queue: MessageQueueWithError[ServerMessageType],
+            self,
+            response_id: str,
+            item: ResponseItem,
+            previous_id: Optional[str],
+            queue: MessageQueueWithError[ServerMessageType],
     ):
         self.type: Literal["message"] = "message"
         self.response_id = response_id
@@ -398,7 +398,7 @@ class RTMessageItem:
     async def __anext__(self):
         message = await self.__queue.receive(
             lambda m: (m.type == "response.content_part.added" and m.item_id == self.id)
-            or (m.type == "response.output_item.done" and m.item.id == self.id)
+                      or (m.type == "response.output_item.done" and m.item.id == self.id)
         )
         if message is None:
             raise StopAsyncIteration
@@ -417,11 +417,11 @@ class RTMessageItem:
 
 class RTFunctionCallItem:
     def __init__(
-        self,
-        response_id: str,
-        item: ResponseItem,
-        previous_id: Optional[str],
-        queue: MessageQueueWithError[ServerMessageType],
+            self,
+            response_id: str,
+            item: ResponseItem,
+            previous_id: Optional[str],
+            queue: MessageQueueWithError[ServerMessageType],
     ) -> None:
         self.type: Literal["function_call"] = "function_call"
         self.response_id = response_id
@@ -454,10 +454,11 @@ class RTFunctionCallItem:
         while True:
             message = await self.__queue.receive(
                 lambda m: (
-                    m.type in ["response.function_call_arguments.delta", "response.function_call_arguments.done"]
-                    and m.item_id == self.id
-                )
-                or (m.type == "response.output_item.done" and m.item.id == self.id)
+                                  m.type in ["response.function_call_arguments.delta",
+                                             "response.function_call_arguments.done"]
+                                  and m.item_id == self.id
+                          )
+                          or (m.type == "response.output_item.done" and m.item.id == self.id)
             )
             if message is None:
                 break
@@ -497,10 +498,10 @@ RTOutputItem = Union[RTMessageItem, RTFunctionCallItem]
 
 class RTResponse:
     def __init__(
-        self,
-        response: Response,
-        queue: MessageQueueWithError[ServerMessageType],
-        client: RTLowLevelClient,
+            self,
+            response: Response,
+            queue: MessageQueueWithError[ServerMessageType],
+            client: RTLowLevelClient,
     ):
         self.type: Literal["response"] = "response"
         self._response = response
@@ -542,7 +543,7 @@ class RTResponse:
             raise StopAsyncIteration
         message = await self.__queue.receive(
             lambda m: (m.type == "response.done" and m.response.id == self.id)
-            or (m.type == "response.output_item.added" and m.response_id == self.id)
+                      or (m.type == "response.output_item.added" and m.response_id == self.id)
         )
         if message is None:
             raise StopAsyncIteration
@@ -573,12 +574,12 @@ class RTResponse:
 
 class RTClient:
     def __init__(
-        self,
-        url: Optional[str] = None,
-        token_credential: Optional[AsyncTokenCredential] = None,
-        key_credential: Optional[AzureKeyCredential] = None,
-        model: Optional[str] = None,
-        azure_deployment: Optional[str] = None,
+            self,
+            url: Optional[str] = None,
+            token_credential: Optional[AsyncTokenCredential] = None,
+            key_credential: Optional[AzureKeyCredential] = None,
+            model: Optional[str] = None,
+            azure_deployment: Optional[str] = None,
     ):
         self._client = RTLowLevelClient(url, token_credential, key_credential, model, azure_deployment)
 
@@ -596,55 +597,6 @@ class RTClient:
         async for message in self._client:
             return message
         return None
-
-    # async def configure(
-    #     self,
-    #     model: Optional[str] = None,
-    #     modalities: Optional[set[Modality]] = None,
-    #     voice: Optional[Voice] = None,
-    #     instructions: Optional[str] = None,
-    #     input_audio_format: Optional[AudioFormat] = None,
-    #     output_audio_format: Optional[AudioFormat] = None,
-    #     input_audio_transcription: Optional[InputAudioTranscription] = None,
-    #     turn_detection: Optional[TurnDetection] = None,
-    #     tools: Optional[ToolsDefinition] = None,
-    #     tool_choice: Optional[ToolChoice] = None,
-    #     temperature: Optional[Temperature] = None,
-    #     max_response_output_tokens: Optional[int] = None,
-    # ) -> Session:
-    #     session_update_params = SessionUpdateParams()
-    #     if model is not None:
-    #         session_update_params.model = model
-    #     if modalities is not None:
-    #         session_update_params.modalities = modalities
-    #     if voice is not None:
-    #         session_update_params.voice = voice
-    #     if instructions is not None:
-    #         session_update_params.instructions = instructions
-    #     if input_audio_format is not None:
-    #         session_update_params.input_audio_format = input_audio_format
-    #     if output_audio_format is not None:
-    #         session_update_params.output_audio_format = output_audio_format
-    #     if input_audio_transcription is not None:
-    #         session_update_params.input_audio_transcription = input_audio_transcription
-    #     if turn_detection is not None:
-    #         session_update_params.turn_detection = turn_detection
-    #     if tools is not None:
-    #         session_update_params.tools = tools
-    #     if tool_choice is not None:
-    #         session_update_params.tool_choice = tool_choice
-    #     if temperature is not None:
-    #         session_update_params.temperature = temperature
-    #     if max_response_output_tokens is not None:
-    #         session_update_params.max_response_output_tokens = max_response_output_tokens
-    #     await self._client.send(SessionUpdateMessage(session=session_update_params))
-    #
-    #     message = await self._message_queue.receive(lambda m: m.type == "session.updated")
-    #     if message.type == "error":
-    #         raise RealtimeException(message.error)
-    #     assert message.type == "session.updated"
-    #     self.session = message.session
-    #     return message.session
 
     async def send_audio(self, audio: bytes) -> None:
         base64_encoded = base64.b64encode(audio).decode("utf-8")
