@@ -216,65 +216,6 @@ class DatabaseManager:
             logger.error(f"Unexpected error fetching business data: {e}")
             return None
 
-    # async def get_business_by_phone(self, phone: str) -> Optional[BusinessContext]:
-    #     try:
-    #         async with self.async_session_factory() as session:
-    #             stmt = select(Business).options(
-    #                 selectinload(Business.categories).selectinload(CatalogCategory.items)
-    #             ).where(Business.phone == phone)
-    #
-    #             result = await session.execute(stmt)
-    #             business = result.scalar_one_or_none()
-    #
-    #             if business:
-    #                 operating_hours_str = (
-    #                     json.dumps(business.operating_hours)
-    #                     if isinstance(business.operating_hours, dict)
-    #                     else str(business.operating_hours)
-    #                 )
-    #
-    #                 services_list = []
-    #                 for category in business.categories:
-    #                     items_for_category = [
-    #                         f"{item.title} (ID: {item.id}, Price: {item.price} {item.price})"
-    #                         for item in category.items
-    #                     ]
-    #                     services_list.append(f"{category.name}: {', '.join(items_for_category)}")
-    #
-    #                 services_str = "\n".join(services_list)
-    #
-    #                 business_context = BusinessContext(
-    #                     id=business.id,
-    #                     name=business.name,
-    #                     description=business.description or "",
-    #                     address=business.address or "",
-    #                     city=business.city or "",
-    #                     country=business.country or "",
-    #                     operating_hours=operating_hours_str,
-    #                     phone=business.phone,
-    #                     services=services_str,
-    #                     greeting_message=business.greeting_message,
-    #                     close_message=business.close_message,
-    #                     human_phone=business.human_phone,
-    #                     default_ai_language=business.default_ai_language,
-    #                     tonality=business.tonality,
-    #                 )
-    #
-    #                 business_context.is_open = self._check_if_open(business_context.operating_hours)
-    #
-    #                 return business_context
-    #             else:
-    #                 logger.error(f"Business context not found for phone: {phone}. Use default prompt")
-    #
-    #             return None
-    #
-    #     except SQLAlchemyError as e:
-    #         logger.error(f"Database error: {e}")
-    #         return None
-    #     except Exception as e:
-    #         logger.error(f"Unexpected error fetching business data: {e}")
-    #         return None
-
     async def close(self):
         await self.engine.dispose()
 
