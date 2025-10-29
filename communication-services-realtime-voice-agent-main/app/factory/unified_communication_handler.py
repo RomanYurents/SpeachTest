@@ -349,7 +349,7 @@ class UnifiedConversationHandler:
            • item_id: id for current item from context
            • quantity: number of portions
         - currency: use "USD"
-        - specialInstructions: leave as empty string
+        - specialInstructions: Any special instructions from the customer
         - estimatedCompletionTime: leave as empty string
         - paymentMethod: use "card"
         - source: use "phone"
@@ -400,7 +400,7 @@ class UnifiedConversationHandler:
                 totalAmount: float = Field(...,
                                            description="The sum of prices of all ordered dishes, always 2 digits after comma")
                 currency: str = Field(..., description="Currency, e.g., USD")
-                specialInstructions: str = Field(..., description="Leave this field empty string")
+                specialInstructions: str = Field(..., description="Any special instructions from the customer")
                 estimatedCompletionTime: str = Field(..., description="Leave this field empty string")
                 paymentMethod: str = Field(..., description="Payment method, e.g., card")
                 source: str = Field(..., description="Order source, e.g., web")
